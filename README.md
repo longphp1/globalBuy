@@ -19,7 +19,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000), then pick a spreadsheet such as Acbuy or Cnfans.
+Open [http://localhost:3000](http://localhost:3000) for the TaooBuy spreadsheet. The other spreadsheets are listed at [http://localhost:3000/spreadsheet](http://localhost:3000/spreadsheet).
 
 ## Deploy on Vercel
 

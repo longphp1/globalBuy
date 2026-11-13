@@ -8,7 +8,9 @@ export default function NotFound() {
         <div className="textDesc">
           <p>This page is not in the spreadsheet.</p>
           <p>
-            <Link href="/">Back to spreadsheets</Link>
+            <Link href="/">Back to TaooBuy</Link>
+            {" · "}
+            <Link href="/spreadsheet">All spreadsheets</Link>
           </p>
         </div>
       </div>
