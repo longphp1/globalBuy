@@ -7,13 +7,8 @@ type PublishedCache = { key: string; catalog: Catalog };
 
 const globalCache = globalThis as unknown as { publishedCatalog?: PublishedCache };
 
-function remoteDatabaseUrl() {
-  return Boolean(
-    process.env.DATABASE_URL_UNPOOLED ||
-      process.env.POSTGRES_URL_NON_POOLING ||
-      process.env.DATABASE_URL ||
-      process.env.POSTGRES_URL,
-  );
+function usesSupabase() {
+  return process.env.VERCEL === "1";
 }
 
 function catalogFile() {
@@ -30,7 +25,7 @@ export function invalidatePublishedCatalog() {
 
 export async function readCatalog(): Promise<Catalog> {
   await connection();
-  if (remoteDatabaseUrl()) {
+  if (usesSupabase()) {
     const { readPublishedCatalog } = await import("@/lib/admin/db");
     const published = await readPublishedCatalog();
     if (published) {

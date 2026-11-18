@@ -82,13 +82,28 @@ const POSTGRES_SCHEMA = [
   "CREATE INDEX IF NOT EXISTS idx_products_menu ON products(menu_id)",
 ];
 
+function cleanDatabaseUrl(raw: string) {
+  const value = raw.trim();
+  if (!value) return "";
+  try {
+    const parsed = new URL(value);
+    parsed.searchParams.delete("pgbouncer");
+    parsed.searchParams.delete("connection_limit");
+    return parsed.toString();
+  } catch {
+    return value;
+  }
+}
+
 export function databaseUrl() {
-  return (
-    process.env.DATABASE_URL_UNPOOLED ||
-    process.env.POSTGRES_URL_NON_POOLING ||
-    process.env.DATABASE_URL ||
-    process.env.POSTGRES_URL ||
-    ""
+  if (process.env.VERCEL !== "1") return "";
+  return cleanDatabaseUrl(
+    process.env.SUPABASE_DB_URL ||
+      process.env.POSTGRES_URL ||
+      process.env.POSTGRES_PRISMA_URL ||
+      process.env.DATABASE_URL ||
+      process.env.POSTGRES_URL_NON_POOLING ||
+      "",
   );
 }
 
@@ -401,12 +416,14 @@ async function openPostgres(url: string, withSeed: boolean) {
 
 export async function getDb(options?: { seed?: boolean }): Promise<SqlDb> {
   const withSeed = options?.seed !== false;
-  const url = databaseUrl();
-  if (url) return openPostgres(url, withSeed);
-  if (process.env.VERCEL) {
-    throw new Error(
-      "Vercel cannot save a SQLite file. Open the Vercel project, go to Storage, create a Neon Postgres database, then redeploy so DATABASE_URL is available.",
-    );
+  if (process.env.VERCEL === "1") {
+    const url = databaseUrl();
+    if (!url) {
+      throw new Error(
+        "This deployment runs on Vercel and saves data in Supabase. Install the Supabase integration in the Vercel project, or set SUPABASE_DB_URL to the database connection string, then redeploy.",
+      );
+    }
+    return openPostgres(url, withSeed);
   }
   return openSqlite(withSeed);
 }

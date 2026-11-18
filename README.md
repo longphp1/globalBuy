@@ -1,6 +1,6 @@
 # Global Buy
 
-多站点购物表格。公开页面展示已发布的商品、分类和代购链接。本机后台把数据写在 SQLite 文件里；部署到 Vercel 后改写入 Neon Postgres，因为 Vercel 不能保存 SQLite 文件。
+多站点购物表格。公开页面展示已发布的商品、分类和代购链接。本机的查询、新增、修改和删除使用 SQLite。部署到 Vercel 后，这些操作改为使用 Supabase 数据库。
 
 ## 一、部署
 
@@ -26,12 +26,12 @@ npm start
 
 | 位置 | 作用 |
 | --- | --- |
-| `data/admin.sqlite` | 本机后台的商品、网站配置和 HioBuy 密钥。已加入 `.gitignore`。没有配置数据库地址时使用这个文件。 |
-| Neon Postgres | Vercel 上的同一份后台数据。由 `DATABASE_URL` 连接。 |
-| `data/catalog.json` | 仓库里的公开站快照，也是数据库里还没有发布快照时的回退数据。 |
+| `data/admin.sqlite` | 本机后台的商品、网站配置和 HioBuy 密钥。已加入 `.gitignore`。只在本机使用。 |
+| Supabase | Vercel 上的商品、网站配置、HioBuy 密钥和发布快照。 |
+| `data/catalog.json` | 仓库里的公开站快照。Supabase 里还没有发布快照时，线上页面用它回退。 |
 | `public/` | 样式、字体、平台图标和商品图片。部署时要带上。 |
 
-改完商品或网站配置后，公开页不会立刻变化。要点后台的 **Update website** 生成新的快照。本机会把快照写入 `data/catalog.json` 并推到 `main`。Vercel 上会把快照写入 Postgres，公开页面随后直接读取这份快照。
+改完商品或网站配置后，公开页不会立刻变化。要点后台的 **Update website** 生成新的快照。本机会把快照写入 `data/catalog.json` 并推到 `main`。Vercel 上会把快照写入 Supabase，公开页面随后直接读取这份快照。
 
 本机上，这个按钮会按顺序执行：
 
@@ -47,16 +47,16 @@ npm start
 
 ### 部署到 Vercel
 
-Vercel 的运行目录是只读的，不能创建或修改 `data/admin.sqlite`，所以后台改用 [Neon Postgres](https://vercel.com/marketplace/neon)。这是 Vercel Storage 里提供的数据库。
+Vercel 的运行目录是只读的，不能创建或修改 `data/admin.sqlite`。线上检测到 `VERCEL=1` 后，查询、新增、修改和删除都连接 Supabase 的 Postgres。本机运行不会读取这个连接，始终使用 SQLite。
 
 1. 把本仓库推到 GitHub。当前远程是 `origin` 的 `main`。
 2. 在 [Vercel](https://vercel.com) 里 Import 这个仓库，框架选 **Next.js**。构建命令保持 `npm run build`，安装命令保持 `npm install`。
-3. 打开该项目的 **Storage**，创建一个 **Neon** 数据库，并连接到这个项目。连接后 Vercel 会写入 `DATABASE_URL`。代码优先使用不带连接池的 `DATABASE_URL_UNPOOLED` 或 `POSTGRES_URL_NON_POOLING`，没有这两项时再用 `DATABASE_URL`。
-4. 重新部署一次，让新的环境变量进入运行环境。确认仓库里包含 `data/catalog.json` 和 `public/`。商品图在 `public` 下。
-5. 打开线上的 `/admin/products`。第一次进入会把 `catalog.json` 里的站点和商品写入 Postgres。之后新增、修改、删除都保存在这张库里。
-6. 在线上点 **Update website** 时，不再执行 git 提交。它只把当前商品生成到 Postgres 的发布快照，首页和详情页接着读取这份快照。本机没有 `DATABASE_URL` 时，这个按钮仍按原来的 git 流程推送 `main`。
+3. 在 Vercel 项目里安装 [Supabase](https://vercel.com/marketplace/supabase) 集成，并选中要使用的 Supabase 项目。集成会写入 `POSTGRES_URL`。也可以不装集成，改为在环境变量里设置 `SUPABASE_DB_URL`，值用 Supabase 控制台里的数据库连接串（Database → Connection string，选 Transaction pooler 或 Session pooler）。
+4. 重新部署一次，让连接串进入运行环境。确认仓库里包含 `data/catalog.json` 和 `public/`。商品图在 `public` 下。
+5. 打开线上的 `/admin/products`。第一次进入会把 `catalog.json` 里的站点和商品写入 Supabase。之后新增、修改、删除和查询都走这张库。
+6. 在线上点 **Update website** 时，不再执行 git 提交。它把当前商品生成到 Supabase 的发布快照，首页和详情页接着读取这份快照。本机的这个按钮仍按原来的 git 流程推送 `main`。
 
-HioBuy 密钥保存在数据库里。换到 Postgres 后要在 **HioBuy settings** 里重新保存一次。`HIOBUY_API_KEY` 和 `HIOBUY_API_BASE` 仍可作为环境变量备用。
+HioBuy 密钥保存在当前环境使用的数据库里。换到 Supabase 后要在 **HioBuy settings** 里重新保存一次。`HIOBUY_API_KEY` 和 `HIOBUY_API_BASE` 仍可作为环境变量备用。
 
 ## 二、对接 HioBuy 查询商品
 
@@ -79,7 +79,7 @@ Authorization: Bearer YOUR_API_KEY
 - **API Key**：上面创建的密钥。
 - **API address**：默认 `https://api.hiobuy.com`，不要带末尾斜杠。
 
-保存后写入本机 SQLite 的 `meta` 表（`hiobuy_api_key`、`hiobuy_api_base`）。没填数据库时，才回退到环境变量 `HIOBUY_API_KEY`、`HIOBUY_API_BASE`。
+保存后写入当前数据库的 `meta` 表（`hiobuy_api_key`、`hiobuy_api_base`）。本机写入 SQLite，Vercel 写入 Supabase。没填数据库时，才回退到环境变量 `HIOBUY_API_KEY`、`HIOBUY_API_BASE`。
 
 ### 本项目发出的请求
 
