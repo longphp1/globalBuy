@@ -87,12 +87,18 @@ export function ProductTable() {
   }
 
   async function generateProject() {
+    if (!window.confirm("将丢弃本地未提交的修改，拉取 main 最新代码，重新生成网站并推送到远程仓库。确定更新网站吗？")) return;
     setGenerating(true);
     setMessage("");
-    const response = await fetch("/admin/api/products/generate", { method: "POST" });
-    const body = await response.json();
-    setGenerating(false);
-    setMessage(response.ok ? `已更新 ${body.sites} 个网站、${body.products} 个商品` : body.message);
+    try {
+      const response = await fetch("/admin/api/products/generate", { method: "POST" });
+      const body = await response.json();
+      setMessage(body.message || (response.ok ? "更新网站完成" : "更新失败"));
+    } catch {
+      setMessage("更新失败");
+    } finally {
+      setGenerating(false);
+    }
   }
 
   function openBrand() {
@@ -175,7 +181,7 @@ export function ProductTable() {
           <Link className="admin-link" href="/admin/products/new">新增商品</Link>
           <button className="admin-btn" type="button" onClick={openConfig}>HioBuy配置</button>
           <Link className="admin-link ghost" href="/admin/products/website">网站配置</Link>
-          <button className="admin-btn" type="button" disabled={generating} onClick={generateProject}>{generating ? "更新中" : "更新项目"}</button>
+          <button className="admin-btn" type="button" disabled={generating} onClick={generateProject}>{generating ? "更新中" : "更新网站"}</button>
           <button className="admin-btn danger" type="button" onClick={() => remove(selected)}>删除商品</button>
           <a className="admin-link ghost" href="/admin/api/products/export">导出</a>
           <Link className="admin-link ghost" href="/admin/products/import">导入</Link>
@@ -222,7 +228,7 @@ export function ProductTable() {
           </div>
         </div>
       </div>
-      {generating ? <div className="admin-loading" role="status">Loading....</div> : null}
+      {generating ? <div className="admin-loading" role="status">正在同步代码并更新网站....</div> : null}
       {brandOpen ? (
         <div className="admin-modal-backdrop" onClick={() => setBrandOpen(false)}>
           <form className="admin-modal" role="dialog" aria-label="修改品牌" onClick={(event) => event.stopPropagation()} onSubmit={saveBrand}>
