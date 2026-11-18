@@ -21,12 +21,12 @@ function text(value: unknown) {
   return value == null ? "" : String(value);
 }
 
-function meta(db: SqlDb, key: string) {
-  return text(db.prepare("SELECT value FROM meta WHERE key = ?").get(key)?.value);
+async function meta(db: SqlDb, key: string) {
+  return text((await db.prepare("SELECT value FROM meta WHERE key = ?").get(key))?.value);
 }
 
-function writeMeta(db: SqlDb, key: string, value: string) {
-  db.prepare("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(key, value);
+async function writeMeta(db: SqlDb, key: string, value: string) {
+  await db.prepare("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(key, value);
 }
 
 function productSlug(name: string, id: number) {
@@ -36,7 +36,7 @@ function productSlug(name: string, id: number) {
 
 export async function getWebsiteConfig(): Promise<WebsiteConfig> {
   const db = await getDb();
-  const storedLanguages = meta(db, "website_languages");
+  const storedLanguages = await meta(db, "website_languages");
   let languages = DEFAULT_LANGUAGES;
   if (storedLanguages) {
     try {
@@ -46,7 +46,7 @@ export async function getWebsiteConfig(): Promise<WebsiteConfig> {
       languages = DEFAULT_LANGUAGES;
     }
   }
-  const sites = db.prepare("SELECT id, catalog_id, slug, name, url, title FROM sites ORDER BY id").all().map((row) => ({
+  const sites = (await db.prepare("SELECT id, catalog_id, slug, name, url, title FROM sites ORDER BY id").all()).map((row) => ({
     id: Number(row.id),
     catalogId: Number(row.catalog_id),
     slug: text(row.slug),
@@ -55,8 +55,8 @@ export async function getWebsiteConfig(): Promise<WebsiteConfig> {
     title: text(row.title),
   }));
   return {
-    pageSize: Math.max(1, Number(meta(db, "website_page_size")) || 50),
-    defaultLanguage: meta(db, "website_default_language") || "en",
+    pageSize: Math.max(1, Number(await meta(db, "website_page_size")) || 50),
+    defaultLanguage: (await meta(db, "website_default_language")) || "en",
     languages,
     sites,
   };
@@ -80,11 +80,11 @@ export async function saveWebsiteConfig(input: Partial<WebsiteConfig> & { remove
   if (!sites.length) throw new Error("请至少保留一个网站");
   const db = await getDb();
   const slugs = new Set<string>();
-  const catalogId = Number(db.prepare("SELECT catalog_id FROM sites ORDER BY id LIMIT 1").get()?.catalog_id) || 1;
-  db.exec("BEGIN");
+  const catalogId = Number((await db.prepare("SELECT catalog_id FROM sites ORDER BY id LIMIT 1").get())?.catalog_id) || 1;
+  await db.exec("BEGIN");
   try {
     const kept = new Set<number>();
-    let nextId = Number(db.prepare("SELECT MAX(id) AS id FROM sites").get()?.id) || 0;
+    let nextId = Number((await db.prepare("SELECT MAX(id) AS id FROM sites").get())?.id) || 0;
     for (const site of sites) {
       const name = text(site.name).trim();
       const slug = siteSlug(name, text(site.slug));
@@ -93,32 +93,32 @@ export async function saveWebsiteConfig(input: Partial<WebsiteConfig> & { remove
       slugs.add(slug);
       const url = text(site.url).trim();
       const title = text(site.title).trim();
-      const current = site.id > 0 ? db.prepare("SELECT id FROM sites WHERE id = ?").get(site.id) : undefined;
+      const current = site.id > 0 ? await db.prepare("SELECT id FROM sites WHERE id = ?").get(site.id) : undefined;
       if (current) {
-        db.prepare("UPDATE sites SET slug = ?, name = ?, url = ?, title = ? WHERE id = ?").run(slug, name, url, title, site.id);
+        await db.prepare("UPDATE sites SET slug = ?, name = ?, url = ?, title = ? WHERE id = ?").run(slug, name, url, title, site.id);
         kept.add(site.id);
       } else {
         nextId += 1;
-        db.prepare("INSERT INTO sites (id, catalog_id, slug, name, url, title) VALUES (?, ?, ?, ?, ?, ?)").run(nextId, catalogId, slug, name, url, title);
+        await db.prepare("INSERT INTO sites (id, catalog_id, slug, name, url, title) VALUES (?, ?, ?, ?, ?, ?)").run(nextId, catalogId, slug, name, url, title);
         kept.add(nextId);
       }
     }
     for (const id of [...new Set((input.removedIds ?? []).map(Number).filter((item) => item > 0))]) {
       if (kept.has(id)) continue;
-      const products = Number(db.prepare("SELECT COUNT(*) AS count FROM products WHERE site_id = ?").get(id)?.count ?? 0);
-      const menus = Number(db.prepare("SELECT COUNT(*) AS count FROM menus WHERE site_id = ?").get(id)?.count ?? 0);
+      const products = Number((await db.prepare("SELECT COUNT(*) AS count FROM products WHERE site_id = ?").get(id))?.count ?? 0);
+      const menus = Number((await db.prepare("SELECT COUNT(*) AS count FROM menus WHERE site_id = ?").get(id))?.count ?? 0);
       if (products || menus) throw new Error("该网站仍有商品或分类，不能删除");
-      db.prepare("DELETE FROM sites WHERE id = ?").run(id);
+      await db.prepare("DELETE FROM sites WHERE id = ?").run(id);
     }
-    writeMeta(db, "website_page_size", String(Math.floor(pageSize)));
-    writeMeta(db, "website_default_language", defaultLanguage);
-    writeMeta(db, "website_languages", JSON.stringify(languages));
-    db.exec("COMMIT");
+    await writeMeta(db, "website_page_size", String(Math.floor(pageSize)));
+    await writeMeta(db, "website_default_language", defaultLanguage);
+    await writeMeta(db, "website_languages", JSON.stringify(languages));
+    await db.exec("COMMIT");
   } catch (error) {
-    db.exec("ROLLBACK");
+    await db.exec("ROLLBACK");
     throw error;
   }
-  touch(db);
+  await touch(db);
   return getWebsiteConfig();
 }
 
@@ -140,12 +140,12 @@ export async function generateWebsite() {
   for (const site of config.sites) {
     const key = String(site.catalogId);
     if (catalogs[key]) continue;
-    const menus = db.prepare(`SELECT m.id, m.name, m.url FROM menus m
+    const menus = await db.prepare(`SELECT m.id, m.name, m.url FROM menus m
       JOIN sites s ON s.id = m.site_id
       WHERE s.catalog_id = ?
       ORDER BY m.id`).all(site.catalogId);
     const menuById = new Map(menus.map((menu) => [Number(menu.id), menu]));
-    const products = db.prepare(`SELECT p.* FROM products p
+    const products = await db.prepare(`SELECT p.* FROM products p
       JOIN sites s ON s.id = p.site_id
       WHERE s.catalog_id = ?
       ORDER BY p.id DESC`).all(site.catalogId);
@@ -191,16 +191,24 @@ export async function generateWebsite() {
       siteId: String(site.catalogId),
     })),
   };
-  const dataDir = path.join(process.cwd(), "data");
-  fs.mkdirSync(dataDir, { recursive: true });
-  const target = path.join(dataDir, "catalog.json");
-  const temp = path.join(dataDir, "catalog.json.tmp");
-  fs.writeFileSync(temp, JSON.stringify(payload));
-  fs.renameSync(temp, target);
+  const serialized = JSON.stringify(payload);
+  await writeMeta(db, "published_catalog", serialized);
+  try {
+    const dataDir = path.join(process.cwd(), "data");
+    fs.mkdirSync(dataDir, { recursive: true });
+    const target = path.join(dataDir, "catalog.json");
+    const temp = path.join(dataDir, "catalog.json.tmp");
+    fs.writeFileSync(temp, serialized);
+    fs.renameSync(temp, target);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    const message = error instanceof Error ? error.message : "";
+    if (code !== "EROFS" && code !== "EACCES" && code !== "EPERM" && !/read-only|EROFS/i.test(message)) throw error;
+  }
   invalidatePublishedCatalog();
   for (const site of config.sites) copyFavicon(site.name, site.slug);
-  writeMeta(db, "website_generated_at", generatedAt);
-  touch(db);
+  await writeMeta(db, "website_generated_at", generatedAt);
+  await touch(db);
   const productCount = Object.values(catalogs).reduce((sum, catalog) => sum + catalog.products.length, 0);
   return { sites: config.sites.length, products: productCount, file: "data/catalog.json" };
 }

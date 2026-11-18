@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["xlsx"],
+  serverExternalPackages: ["xlsx", "postgres"],
   turbopack: {
     root: path.dirname(fileURLToPath(import.meta.url)),
   },

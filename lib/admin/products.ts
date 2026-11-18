@@ -89,11 +89,11 @@ const SELECT = `SELECT p.*, s.name AS site_name, m.name AS menu_name
 export async function listMeta() {
   const db = await getDb();
   return {
-    sites: db.prepare("SELECT id, catalog_id, name FROM sites ORDER BY id").all(),
-    menus: db.prepare("SELECT id, site_id, name FROM menus ORDER BY id").all(),
-    brands: db
+    sites: await db.prepare("SELECT id, catalog_id, name FROM sites ORDER BY id").all(),
+    menus: await db.prepare("SELECT id, site_id, name FROM menus ORDER BY id").all(),
+    brands: (await db
       .prepare("SELECT DISTINCT brand FROM products WHERE brand IS NOT NULL AND brand != '' ORDER BY brand")
-      .all()
+      .all())
       .map((row) => text(row.brand)),
   };
 }
@@ -137,25 +137,25 @@ export async function listProducts(query: {
   const order = query.order === "asc" ? "ASC" : "DESC";
   const page = Math.max(1, query.page || 1);
   const limit = Math.min(100, Math.max(1, query.limit || 15));
-  const total = Number(db.prepare(`SELECT COUNT(*) AS count FROM products p ${clause}`).get(...args)?.count ?? 0);
-  const rows = db
+  const total = Number((await db.prepare(`SELECT COUNT(*) AS count FROM products p ${clause}`).get(...args))?.count ?? 0);
+  const rows = (await db
     .prepare(`${SELECT} ${clause} ORDER BY p.${field} ${order} LIMIT ? OFFSET ?`)
-    .all(...args, limit, (page - 1) * limit)
+    .all(...args, limit, (page - 1) * limit))
     .map(rowToProduct);
   return { total, page, limit, data: rows };
 }
 
 export async function getProduct(id: number) {
   const db = await getDb();
-  const row = db.prepare(`${SELECT} WHERE p.id = ?`).get(id);
+  const row = await db.prepare(`${SELECT} WHERE p.id = ?`).get(id);
   return row ? rowToProduct(row) : null;
 }
 
-function normalize(input: ProductInput, db: SqlDb, id = 0) {
+async function normalize(input: ProductInput, db: SqlDb, id = 0) {
   const name = input.name.trim();
   if (!name) throw new Error("请填写商品名称");
   if (!input.site_id || !input.menu_id) throw new Error("请选择网站和分类");
-  const menu = db.prepare(`SELECT m.id FROM menus m
+  const menu = await db.prepare(`SELECT m.id FROM menus m
     JOIN sites menu_site ON menu_site.id = m.site_id
     JOIN sites chosen ON chosen.id = ?
     WHERE m.id = ? AND menu_site.catalog_id = chosen.catalog_id`).get(input.site_id, input.menu_id);
@@ -184,7 +184,7 @@ function normalize(input: ProductInput, db: SqlDb, id = 0) {
     note_content: input.note_content ?? "",
     tao_buy_platform: input.tao_buy_platform ?? "",
     tao_buy_link: input.tao_buy_link ?? "",
-    slug: uniqueSlug(db, name, id),
+    slug: await uniqueSlug(db, name, id),
     updated_at: stamp,
     created_at: stamp,
   };
@@ -192,8 +192,8 @@ function normalize(input: ProductInput, db: SqlDb, id = 0) {
 
 export async function createProduct(input: ProductInput) {
   const db = await getDb();
-  const data = normalize(input, db);
-  const result = db.prepare(`INSERT INTO products (
+  const data = await normalize(input, db);
+  const result = await db.prepare(`INSERT INTO products (
     site_id, menu_id, page, range, name, price, brand, source, source_product_id, source_product_url,
     main_img, img, main_buy_link, main_buy_platform, other_buy_link, other_buy_platform, note_link,
     note_content, tao_buy_platform, tao_buy_link, slug, created_at, updated_at
@@ -203,16 +203,16 @@ export async function createProduct(input: ProductInput) {
     data.main_buy_platform, data.other_buy_link, data.other_buy_platform, data.note_link, data.note_content,
     data.tao_buy_platform, data.tao_buy_link, data.slug, data.created_at, data.updated_at,
   );
-  touch(db);
+  await touch(db);
   return getProduct(Number(result.lastInsertRowid));
 }
 
 export async function updateProduct(id: number, input: ProductInput) {
   const db = await getDb();
-  const current = db.prepare("SELECT id, slug, created_at FROM products WHERE id = ?").get(id);
+  const current = await db.prepare("SELECT id, slug, created_at FROM products WHERE id = ?").get(id);
   if (!current) return null;
-  const data = normalize(input, db, id);
-  db.prepare(`UPDATE products SET
+  const data = await normalize(input, db, id);
+  await db.prepare(`UPDATE products SET
     site_id=?, menu_id=?, page=?, range=?, name=?, price=?, brand=?, source=?, source_product_id=?,
     source_product_url=?, main_img=?, img=?, main_buy_link=?, main_buy_platform=?, other_buy_link=?,
     other_buy_platform=?, note_link=?, note_content=?, tao_buy_platform=?, tao_buy_link=?, slug=?, updated_at=?
@@ -222,7 +222,7 @@ export async function updateProduct(id: number, input: ProductInput) {
     data.main_buy_platform, data.other_buy_link, data.other_buy_platform, data.note_link, data.note_content,
     data.tao_buy_platform, data.tao_buy_link, text(current.slug) || data.slug, data.updated_at, id,
   );
-  touch(db);
+  await touch(db);
   return getProduct(id);
 }
 
@@ -231,8 +231,8 @@ export async function deleteProducts(ids: number[]) {
   const unique = [...new Set(ids.map(Number).filter((id) => id > 0))];
   if (!unique.length) throw new Error("Select products to delete");
   const placeholders = unique.map(() => "?").join(",");
-  const result = db.prepare(`DELETE FROM products WHERE id IN (${placeholders})`).run(...unique);
-  touch(db);
+  const result = await db.prepare(`DELETE FROM products WHERE id IN (${placeholders})`).run(...unique);
+  await touch(db);
   return result.changes;
 }
 
@@ -241,8 +241,8 @@ export async function changeBrand(oldBrand: string, newBrand: string) {
   const to = cleanBrand(newBrand);
   if (!from || !to) throw new Error("Enter the original brand and the new brand");
   const db = await getDb();
-  const result = db.prepare("UPDATE products SET brand = ?, updated_at = ? WHERE brand = ?").run(to, now(), from);
-  touch(db);
+  const result = await db.prepare("UPDATE products SET brand = ?, updated_at = ? WHERE brand = ?").run(to, now(), from);
+  await touch(db);
   return result.changes;
 }
 
@@ -266,7 +266,7 @@ const EXPORT_HEADER = [
 
 export async function exportWorkbook() {
   const db = await getDb();
-  const rows = db.prepare(`${SELECT} ORDER BY p.id DESC`).all().map(rowToProduct);
+  const rows = (await db.prepare(`${SELECT} ORDER BY p.id DESC`).all()).map(rowToProduct);
   const sheet = [EXPORT_HEADER, ...rows.map((item) => [
     item.menu_name,
     item.brand,
@@ -367,7 +367,7 @@ async function writeImported(items: Record<string, string | number>[]) {
   let updated = 0;
   let skipped = 0;
   const stamp = now();
-  db.exec("BEGIN");
+  await db.exec("BEGIN");
   try {
     for (const item of items) {
       const name = text(item.name).trim();
@@ -376,14 +376,14 @@ async function writeImported(items: Record<string, string | number>[]) {
         skipped += 1;
         continue;
       }
-      const menu = db.prepare("SELECT id, site_id FROM menus WHERE name = ? ORDER BY id LIMIT 1").get(text(item.menuName));
+      const menu = await db.prepare("SELECT id, site_id FROM menus WHERE name = ? ORDER BY id LIMIT 1").get(text(item.menuName));
       if (!menu) {
         skipped += 1;
         continue;
       }
       const sourceUrl = text(item.source_product_url || item.main_buy_link);
       const parsed = sourceUrl ? sourceFromUrl(sourceUrl) : { source: "", source_product_id: "", platform: "" };
-      const existing = db.prepare("SELECT id, range FROM products WHERE name = ?").get(name);
+      const existing = await db.prepare("SELECT id, range FROM products WHERE name = ?").get(name);
       const payload = {
         site_id: Number(menu.site_id),
         menu_id: Number(menu.id),
@@ -405,7 +405,7 @@ async function writeImported(items: Record<string, string | number>[]) {
         tao_buy_link: text(item.tao_buy_link),
       };
       if (existing) {
-        db.prepare(`UPDATE products SET brand=?, price=?, main_img=?, img=?, source=?, source_product_id=?,
+        await db.prepare(`UPDATE products SET brand=?, price=?, main_img=?, img=?, source=?, source_product_id=?,
           source_product_url=?, main_buy_link=?, main_buy_platform=?, other_buy_link=?, other_buy_platform=?,
           note_link=?, note_content=?, tao_buy_platform=?, tao_buy_link=?, updated_at=? WHERE id=?`).run(
           payload.brand, payload.price, payload.main_img, payload.img, payload.source, payload.source_product_id,
@@ -415,8 +415,9 @@ async function writeImported(items: Record<string, string | number>[]) {
         );
         updated += 1;
       } else {
-        const maxRange = Number(db.prepare("SELECT MAX(range) AS range FROM products WHERE menu_id = ?").get(payload.menu_id)?.range ?? 0) + 1;
-        db.prepare(`INSERT INTO products (
+        const maxRange = Number((await db.prepare("SELECT MAX(range) AS range FROM products WHERE menu_id = ?").get(payload.menu_id))?.range ?? 0) + 1;
+        const slug = await uniqueSlug(db, payload.name);
+        await db.prepare(`INSERT INTO products (
           site_id, menu_id, page, range, name, price, brand, source, source_product_id, source_product_url,
           main_img, img, main_buy_link, main_buy_platform, other_buy_link, other_buy_platform, note_link,
           note_content, tao_buy_platform, tao_buy_link, slug, created_at, updated_at
@@ -425,23 +426,23 @@ async function writeImported(items: Record<string, string | number>[]) {
           payload.brand, payload.source, payload.source_product_id, payload.source_product_url, payload.main_img,
           payload.img, payload.main_buy_link, payload.main_buy_platform, payload.other_buy_link, payload.other_buy_platform,
           payload.note_link, payload.note_content, payload.tao_buy_platform, payload.tao_buy_link,
-          uniqueSlug(db, payload.name), stamp, stamp,
+          slug, stamp, stamp,
         );
         created += 1;
       }
     }
-    db.exec("COMMIT");
+    await db.exec("COMMIT");
   } catch (error) {
-    db.exec("ROLLBACK");
+    await db.exec("ROLLBACK");
     throw error;
   }
-  touch(db);
+  await touch(db);
   return { created, updated, skipped, failed: 0 };
 }
 
 async function importBySourceUrl(rows: (string | number | null)[][], siteId: number, menuId: number) {
   const db = await getDb();
-  const menu = db.prepare(`SELECT m.id FROM menus m
+  const menu = await db.prepare(`SELECT m.id FROM menus m
     JOIN sites menu_site ON menu_site.id = m.site_id
     JOIN sites chosen ON chosen.id = ?
     WHERE m.id = ? AND menu_site.catalog_id = chosen.catalog_id`).get(siteId, menuId);
@@ -453,7 +454,7 @@ async function importBySourceUrl(rows: (string | number | null)[][], siteId: num
   let updated = 0;
   const failed = [...fetched.skipped];
   const stamp = now();
-  db.exec("BEGIN");
+  await db.exec("BEGIN");
   try {
     for (const item of fetched.results) {
       if (!item.success || !item.product) {
@@ -461,11 +462,11 @@ async function importBySourceUrl(rows: (string | number | null)[][], siteId: num
         continue;
       }
       const product = item.product;
-      const existing = db.prepare(`SELECT id FROM products WHERE site_id = ? AND menu_id = ? AND (
+      const existing = await db.prepare(`SELECT id FROM products WHERE site_id = ? AND menu_id = ? AND (
         (source_product_id != '' AND source_product_id = ?) OR (source_product_url != '' AND source_product_url = ?)
       )`).get(siteId, menuId, product.source_product_id, product.source_product_url);
       if (existing) {
-        db.prepare(`UPDATE products SET name=?, brand=?, price=?, source=?, source_product_id=?, source_product_url=?,
+        await db.prepare(`UPDATE products SET name=?, brand=?, price=?, source=?, source_product_id=?, source_product_url=?,
           main_img=?, img=?, main_buy_link=?, main_buy_platform=?, updated_at=? WHERE id=?`).run(
           product.name, product.brand, product.price, product.source, product.source_product_id,
           product.source_product_url, product.main_img, product.img, product.main_buy_link,
@@ -473,25 +474,26 @@ async function importBySourceUrl(rows: (string | number | null)[][], siteId: num
         );
         updated += 1;
       } else {
-        const maxRange = Number(db.prepare("SELECT MAX(range) AS range FROM products WHERE site_id = ? AND menu_id = ?").get(siteId, menuId)?.range ?? 0) + 1;
-        db.prepare(`INSERT INTO products (
+        const maxRange = Number((await db.prepare("SELECT MAX(range) AS range FROM products WHERE site_id = ? AND menu_id = ?").get(siteId, menuId))?.range ?? 0) + 1;
+        const slug = await uniqueSlug(db, product.name);
+        await db.prepare(`INSERT INTO products (
           site_id, menu_id, page, range, name, price, brand, source, source_product_id, source_product_url,
           main_img, img, main_buy_link, main_buy_platform, other_buy_link, other_buy_platform, note_link,
           note_content, tao_buy_platform, tao_buy_link, slug, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '', '', '', '', '', ?, ?, ?)`).run(
           siteId, menuId, Math.ceil(maxRange / 100), maxRange, product.name, product.price, product.brand,
           product.source, product.source_product_id, product.source_product_url, product.main_img, product.img,
-          product.main_buy_link, product.main_buy_platform, uniqueSlug(db, product.name), stamp, stamp,
+          product.main_buy_link, product.main_buy_platform, slug, stamp, stamp,
         );
         created += 1;
       }
     }
-    db.exec("COMMIT");
+    await db.exec("COMMIT");
   } catch (error) {
-    db.exec("ROLLBACK");
+    await db.exec("ROLLBACK");
     throw error;
   }
-  touch(db);
+  await touch(db);
   if (!created && !updated) throw new Error(failed[0]?.error || "没有可导入的商品链接");
   return { created, updated, skipped: 0, failed: failed.length, errors: failed.slice(0, 5) };
 }

@@ -1,6 +1,6 @@
 # Global Buy
 
-多站点购物表格。公开页面展示已发布的商品、分类和代购链接；后台在本地维护商品，再把生成结果提交到仓库。线上站点读的是仓库里的 `data/catalog.json`，不是本地 SQLite。
+多站点购物表格。公开页面展示已发布的商品、分类和代购链接。本机后台把数据写在 SQLite 文件里；部署到 Vercel 后改写入 Neon Postgres，因为 Vercel 不能保存 SQLite 文件。
 
 ## 一、部署
 
@@ -24,15 +24,16 @@ npm start
 
 ### 数据放在哪里
 
-| 文件 | 作用 |
+| 位置 | 作用 |
 | --- | --- |
-| `data/admin.sqlite` | 后台商品、网站配置、HioBuy 密钥。已加入 `.gitignore`，只留在本机。 |
-| `data/catalog.json` | 公开站实际读取的快照：站点、分类、商品、每页数量。会随「Update website」提交。 |
+| `data/admin.sqlite` | 本机后台的商品、网站配置和 HioBuy 密钥。已加入 `.gitignore`。没有配置数据库地址时使用这个文件。 |
+| Neon Postgres | Vercel 上的同一份后台数据。由 `DATABASE_URL` 连接。 |
+| `data/catalog.json` | 仓库里的公开站快照，也是数据库里还没有发布快照时的回退数据。 |
 | `public/` | 样式、字体、平台图标和商品图片。部署时要带上。 |
 
-改完商品或网站配置后，公开页不会立刻变化。要点后台的 **Update website**，生成新的 `catalog.json` 并推到 `main`。
+改完商品或网站配置后，公开页不会立刻变化。要点后台的 **Update website** 生成新的快照。本机会把快照写入 `data/catalog.json` 并推到 `main`。Vercel 上会把快照写入 Postgres，公开页面随后直接读取这份快照。
 
-这个按钮会按顺序执行：
+本机上，这个按钮会按顺序执行：
 
 1. `git reset --hard HEAD`
 2. `git clean -fd`
@@ -46,15 +47,16 @@ npm start
 
 ### 部署到 Vercel
 
-公开站适合放在 Vercel。后台依赖本机 SQLite，并且「Update website」要在本机执行 git 推送，这两件事不要放到 Vercel 的无状态函数上。日常流程是：本机改商品，点 **Update website** 推到 GitHub 的 `main`，Vercel 跟着这次推送重新构建。
+Vercel 的运行目录是只读的，不能创建或修改 `data/admin.sqlite`，所以后台改用 [Neon Postgres](https://vercel.com/marketplace/neon)。这是 Vercel Storage 里提供的数据库。
 
 1. 把本仓库推到 GitHub。当前远程是 `origin` 的 `main`。
-2. 在 [Vercel](https://vercel.com) 里 Import 这个仓库，框架选 **Next.js**。
-3. 构建命令保持 `npm run build`，安装命令保持 `npm install`。公开站不需要环境变量。
-4. 确认仓库里包含 `data/catalog.json` 和 `public/`。商品图在 `public` 下，缺了这些文件，线上列表和图片是空的。
-5. 部署完成后，以后每次在本机点 **Update website**，Vercel 会因 `main` 更新而重新部署。
+2. 在 [Vercel](https://vercel.com) 里 Import 这个仓库，框架选 **Next.js**。构建命令保持 `npm run build`，安装命令保持 `npm install`。
+3. 打开该项目的 **Storage**，创建一个 **Neon** 数据库，并连接到这个项目。连接后 Vercel 会写入 `DATABASE_URL`。代码优先使用不带连接池的 `DATABASE_URL_UNPOOLED` 或 `POSTGRES_URL_NON_POOLING`，没有这两项时再用 `DATABASE_URL`。
+4. 重新部署一次，让新的环境变量进入运行环境。确认仓库里包含 `data/catalog.json` 和 `public/`。商品图在 `public` 下。
+5. 打开线上的 `/admin/products`。第一次进入会把 `catalog.json` 里的站点和商品写入 Postgres。之后新增、修改、删除都保存在这张库里。
+6. 在线上点 **Update website** 时，不再执行 git 提交。它只把当前商品生成到 Postgres 的发布快照，首页和详情页接着读取这份快照。本机没有 `DATABASE_URL` 时，这个按钮仍按原来的 git 流程推送 `main`。
 
-`HIOBUY_API_KEY` 和 `HIOBUY_API_BASE` 只给本机后台查商品时备用。密钥也可以只保存在后台的 HioBuy settings 里，不必配到 Vercel。
+HioBuy 密钥保存在数据库里。换到 Postgres 后要在 **HioBuy settings** 里重新保存一次。`HIOBUY_API_KEY` 和 `HIOBUY_API_BASE` 仍可作为环境变量备用。
 
 ## 二、对接 HioBuy 查询商品
 

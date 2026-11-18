@@ -94,7 +94,7 @@ function mapProduct(product: Record<string, unknown>, inputUrl: string): SourceP
 
 async function metaValue(key: string) {
   const db = await getDb();
-  return String(db.prepare("SELECT value FROM meta WHERE key = ?").get(key)?.value ?? "");
+  return String((await db.prepare("SELECT value FROM meta WHERE key = ?").get(key))?.value ?? "");
 }
 
 export async function getHiobuyConfig() {
@@ -110,8 +110,8 @@ export async function saveHiobuyConfig(input: { apiKey?: string; apiBase?: strin
   if (!/^https?:\/\//i.test(apiBase)) throw new Error("Enter a valid API address");
   const db = await getDb();
   const write = db.prepare("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
-  write.run("hiobuy_api_key", apiKey);
-  write.run("hiobuy_api_base", apiBase);
+  await write.run("hiobuy_api_key", apiKey);
+  await write.run("hiobuy_api_base", apiBase);
   return { apiKey, apiBase };
 }
 

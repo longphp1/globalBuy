@@ -72,6 +72,16 @@ async function commitAndPush() {
 }
 
 export async function publishWebsite() {
+  if (process.env.VERCEL) {
+    const generated = await generateWebsite();
+    return {
+      ...generated,
+      committed: false,
+      pushed: false,
+      commit: "",
+      message: `Updated ${generated.sites} sites and ${generated.products} products`,
+    };
+  }
   await syncMain();
   let generated: Awaited<ReturnType<typeof generateWebsite>>;
   try {

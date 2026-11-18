@@ -3,9 +3,18 @@ import path from "node:path";
 import { connection } from "next/server";
 import type { Catalog, Site, SiteCatalog } from "@/lib/types";
 
-type PublishedCache = { mtimeMs: number; size: number; catalog: Catalog };
+type PublishedCache = { key: string; catalog: Catalog };
 
 const globalCache = globalThis as unknown as { publishedCatalog?: PublishedCache };
+
+function remoteDatabaseUrl() {
+  return Boolean(
+    process.env.DATABASE_URL_UNPOOLED ||
+      process.env.POSTGRES_URL_NON_POOLING ||
+      process.env.DATABASE_URL ||
+      process.env.POSTGRES_URL,
+  );
+}
 
 function catalogFile() {
   return path.join(process.cwd(), "data", "catalog.json");
@@ -21,13 +30,23 @@ export function invalidatePublishedCatalog() {
 
 export async function readCatalog(): Promise<Catalog> {
   await connection();
+  if (remoteDatabaseUrl()) {
+    const { readPublishedCatalog } = await import("@/lib/admin/db");
+    const published = await readPublishedCatalog();
+    if (published) {
+      const key = published.generatedAt || "published";
+      if (globalCache.publishedCatalog?.key === key) return globalCache.publishedCatalog.catalog;
+      globalCache.publishedCatalog = { key, catalog: published };
+      return published;
+    }
+  }
   const file = catalogFile();
   if (!fs.existsSync(file)) return emptyCatalog();
   const stat = fs.statSync(file);
-  const cached = globalCache.publishedCatalog;
-  if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) return cached.catalog;
+  const key = `${stat.mtimeMs}:${stat.size}`;
+  if (globalCache.publishedCatalog?.key === key) return globalCache.publishedCatalog.catalog;
   const catalog = JSON.parse(fs.readFileSync(file, "utf8")) as Catalog;
-  globalCache.publishedCatalog = { mtimeMs: stat.mtimeMs, size: stat.size, catalog };
+  globalCache.publishedCatalog = { key, catalog };
   return catalog;
 }
 
