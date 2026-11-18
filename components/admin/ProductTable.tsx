@@ -83,19 +83,19 @@ export function ProductTable() {
       setConfigMessage(body.message);
       return;
     }
-    setConfigMessage("已保存");
+    setConfigMessage("Saved");
   }
 
   async function generateProject() {
-    if (!window.confirm("将丢弃本地未提交的修改，拉取 main 最新代码，重新生成网站并推送到远程仓库。确定更新网站吗？")) return;
+    if (!window.confirm("This discards uncommitted local changes, pulls the latest main branch, regenerates the website, and pushes it to the remote repository. Update the website?")) return;
     setGenerating(true);
     setMessage("");
     try {
       const response = await fetch("/admin/api/products/generate", { method: "POST" });
       const body = await response.json();
-      setMessage(body.message || (response.ok ? "更新网站完成" : "更新失败"));
+      setMessage(body.message || (response.ok ? "Website updated" : "Update failed"));
     } catch {
-      setMessage("更新失败");
+      setMessage("Update failed");
     } finally {
       setGenerating(false);
     }
@@ -123,7 +123,7 @@ export function ProductTable() {
       setBrandMessage(body.message);
       return;
     }
-    setBrandMessage(`已修改 ${body.count} 条`);
+    setBrandMessage(`Updated ${body.count} items`);
     const metaResponse = await fetch("/admin/api/products/meta");
     setMeta(await metaResponse.json());
     load(page, filters);
@@ -131,17 +131,17 @@ export function ProductTable() {
 
   async function remove(ids: number[]) {
     if (!ids.length) {
-      setMessage("请选择要删除的商品");
+      setMessage("Select products to delete");
       return;
     }
-    if (!window.confirm(ids.length > 1 ? "确定删除选中的商品吗？" : "确定删除该商品吗？")) return;
+    if (!window.confirm(ids.length > 1 ? "Delete the selected products?" : "Delete this product?")) return;
     const response = await fetch("/admin/api/products/batch-delete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids }),
     });
     const body = await response.json();
-    setMessage(response.ok ? `已删除 ${body.count} 条` : body.message);
+    setMessage(response.ok ? `Deleted ${body.count} items` : body.message);
     if (response.ok) load(page, filters);
   }
 
@@ -151,48 +151,50 @@ export function ProductTable() {
     <>
       <div className="admin-card">
         <form className="admin-filters" onSubmit={(event) => { event.preventDefault(); load(1, filters); }}>
-          <label className="admin-field">商品名称
+          <label className="admin-field">Product name
             <input value={filters.name} onChange={(event) => setFilters({ ...filters, name: event.target.value })} />
           </label>
-          <label className="admin-field">品牌
+          <label className="admin-field">Brand
             <select value={filters.brand} onChange={(event) => setFilters({ ...filters, brand: event.target.value })}>
-              <option value="">请选择</option>
+              <option value="">Select</option>
               {meta.brands.map((brand) => <option key={brand} value={brand}>{brand}</option>)}
             </select>
           </label>
-          <label className="admin-field">分类
+          <label className="admin-field">Category
             <select value={filters.menuId} onChange={(event) => setFilters({ ...filters, menuId: event.target.value })}>
-              <option value="">请选择</option>
+              <option value="">Select</option>
               {meta.menus.map((menu) => <option key={menu.id} value={menu.id}>{menu.name}</option>)}
             </select>
           </label>
-          <label className="admin-field">开始时间
+          <label className="admin-field">Start date
             <input type="date" value={filters.from} onChange={(event) => setFilters({ ...filters, from: event.target.value })} />
           </label>
-          <label className="admin-field">结束时间
+          <label className="admin-field">End date
             <input type="date" value={filters.to} onChange={(event) => setFilters({ ...filters, to: event.target.value })} />
           </label>
-          <button className="admin-btn" type="submit">查询</button>
-          <button className="admin-btn ghost" type="button" onClick={() => { const empty = { name: "", brand: "", menuId: "", from: "", to: "" }; setFilters(empty); load(1, empty); }}>重置</button>
+          <button className="admin-btn" type="submit">Search</button>
+          <button className="admin-btn ghost" type="button" onClick={() => { const empty = { name: "", brand: "", menuId: "", from: "", to: "" }; setFilters(empty); load(1, empty); }}>Reset</button>
         </form>
       </div>
       <div className="admin-card">
         <div className="admin-actions" style={{ marginBottom: 12 }}>
-          <Link className="admin-link" href="/admin/products/new">新增商品</Link>
-          <button className="admin-btn" type="button" onClick={openConfig}>HioBuy配置</button>
-          <Link className="admin-link ghost" href="/admin/products/website">网站配置</Link>
-          <button className="admin-btn" type="button" disabled={generating} onClick={generateProject}>{generating ? "更新中" : "更新网站"}</button>
-          <button className="admin-btn danger" type="button" onClick={() => remove(selected)}>删除商品</button>
-          <a className="admin-link ghost" href="/admin/api/products/export">导出</a>
-          <Link className="admin-link ghost" href="/admin/products/import">导入</Link>
-          <button className="admin-btn ghost" type="button" onClick={openBrand}>修改品牌</button>
+          <button className="admin-btn" type="button" onClick={openConfig}>HioBuy settings</button>
+          <Link className="admin-link ghost" href="/admin/products/website">Website settings</Link>
+          <button className="admin-btn" type="button" disabled={generating} onClick={generateProject}>{generating ? "Updating" : "Update website"}</button>
+        </div>
+        <div className="admin-actions" style={{ marginBottom: 12 }}>
+          <Link className="admin-link" href="/admin/products/new">Add product</Link>
+          <button className="admin-btn danger" type="button" onClick={() => remove(selected)}>Delete products</button>
+          <a className="admin-link ghost" href="/admin/api/products/export">Export</a>
+          <Link className="admin-link ghost" href="/admin/products/import">Import</Link>
+          <button className="admin-btn ghost" type="button" onClick={openBrand}>Change brand</button>
         </div>
         {message ? <p className="admin-note">{message}</p> : null}
         <div className="admin-table-wrap">
           <table className="admin-table">
             <thead>
               <tr>
-                <th></th><th>ID</th><th>分类</th><th>商品名称</th><th>品牌</th><th>价格</th><th>来源</th><th>商品ID</th><th>商品链接</th><th>图片</th><th>创建时间</th><th>操作</th>
+                <th></th><th>ID</th><th>Category</th><th>Product name</th><th>Brand</th><th>Price</th><th>Source</th><th>Product ID</th><th>Product link</th><th>Image</th><th>Created</th><th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -206,13 +208,13 @@ export function ProductTable() {
                   <td>{row.price}</td>
                   <td>{row.source}</td>
                   <td>{row.source_product_id}</td>
-                  <td>{row.source_product_url ? <a href={row.source_product_url} target="_blank" rel="noreferrer">打开</a> : ""}</td>
+                  <td>{row.source_product_url ? <a href={row.source_product_url} target="_blank" rel="noreferrer">Open</a> : ""}</td>
                   <td>{row.main_img ? <img src={row.main_img} alt="" /> : ""}</td>
                   <td>{row.created_at}</td>
                   <td>
-                    <Link href={`/admin/products/${row.id}/edit`}>编辑</Link>
+                    <Link href={`/admin/products/${row.id}/edit`}>Edit</Link>
                     {" "}
-                    <button className="admin-btn danger" type="button" onClick={() => remove([row.id])}>删除商品</button>
+                    <button className="admin-btn danger" type="button" onClick={() => remove([row.id])}>Delete</button>
                   </td>
                 </tr>
               ))}
@@ -220,50 +222,50 @@ export function ProductTable() {
           </table>
         </div>
         <div className="admin-pager">
-          <span className="admin-note">共 {total} 条</span>
+          <span className="admin-note">{total} items</span>
           <div className="admin-actions">
-            <button className="admin-btn ghost" type="button" disabled={page <= 1} onClick={() => load(page - 1, filters)}>上一页</button>
+            <button className="admin-btn ghost" type="button" disabled={page <= 1} onClick={() => load(page - 1, filters)}>Previous</button>
             <span>{page} / {pages}</span>
-            <button className="admin-btn ghost" type="button" disabled={page >= pages} onClick={() => load(page + 1, filters)}>下一页</button>
+            <button className="admin-btn ghost" type="button" disabled={page >= pages} onClick={() => load(page + 1, filters)}>Next</button>
           </div>
         </div>
       </div>
-      {generating ? <div className="admin-loading" role="status">正在同步代码并更新网站....</div> : null}
+      {generating ? <div className="admin-loading" role="status">Syncing code and updating the website....</div> : null}
       {brandOpen ? (
         <div className="admin-modal-backdrop" onClick={() => setBrandOpen(false)}>
-          <form className="admin-modal" role="dialog" aria-label="修改品牌" onClick={(event) => event.stopPropagation()} onSubmit={saveBrand}>
-            <h2>修改品牌</h2>
-            <label className="admin-field">原品牌
+          <form className="admin-modal" role="dialog" aria-label="Change brand" onClick={(event) => event.stopPropagation()} onSubmit={saveBrand}>
+            <h2>Change brand</h2>
+            <label className="admin-field">Original brand
               <select required value={oldBrand} onChange={(event) => setOldBrand(event.target.value)}>
-                <option value="">请选择</option>
+                <option value="">Select</option>
                 {meta.brands.map((brand) => <option key={brand} value={brand}>{brand}</option>)}
               </select>
             </label>
-            <label className="admin-field">新品牌
+            <label className="admin-field">New brand
               <input required value={newBrand} onChange={(event) => setNewBrand(event.target.value)} />
             </label>
-            {brandMessage ? <p className={brandMessage.startsWith("已修改") ? "admin-ok" : "admin-error"}>{brandMessage}</p> : null}
+            {brandMessage ? <p className={brandMessage.startsWith("Updated") ? "admin-ok" : "admin-error"}>{brandMessage}</p> : null}
             <div className="admin-actions">
-              <button className="admin-btn" disabled={brandSaving} type="submit">{brandSaving ? "保存中" : "提交"}</button>
-              <button className="admin-btn ghost" type="button" onClick={() => setBrandOpen(false)}>取消</button>
+              <button className="admin-btn" disabled={brandSaving} type="submit">{brandSaving ? "Saving" : "Submit"}</button>
+              <button className="admin-btn ghost" type="button" onClick={() => setBrandOpen(false)}>Cancel</button>
             </div>
           </form>
         </div>
       ) : null}
       {configOpen ? (
         <div className="admin-modal-backdrop" onClick={() => setConfigOpen(false)}>
-          <form className="admin-modal" role="dialog" aria-label="HioBuy 配置" onClick={(event) => event.stopPropagation()} onSubmit={saveConfig}>
-            <h2>HioBuy 配置</h2>
+          <form className="admin-modal" role="dialog" aria-label="HioBuy settings" onClick={(event) => event.stopPropagation()} onSubmit={saveConfig}>
+            <h2>HioBuy settings</h2>
             <label className="admin-field">API Key
               <input value={apiKey} onChange={(event) => setApiKey(event.target.value)} autoComplete="off" />
             </label>
-            <label className="admin-field">接口地址
+            <label className="admin-field">API address
               <input value={apiBase} onChange={(event) => setApiBase(event.target.value)} />
             </label>
-            {configMessage ? <p className={configMessage === "已保存" ? "admin-ok" : "admin-error"}>{configMessage}</p> : null}
+            {configMessage ? <p className={configMessage === "Saved" ? "admin-ok" : "admin-error"}>{configMessage}</p> : null}
             <div className="admin-actions">
-              <button className="admin-btn" disabled={configSaving} type="submit">{configSaving ? "保存中" : "保存"}</button>
-              <button className="admin-btn ghost" type="button" onClick={() => setConfigOpen(false)}>取消</button>
+              <button className="admin-btn" disabled={configSaving} type="submit">{configSaving ? "Saving" : "Save"}</button>
+              <button className="admin-btn ghost" type="button" onClick={() => setConfigOpen(false)}>Cancel</button>
             </div>
           </form>
         </div>

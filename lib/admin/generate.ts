@@ -135,7 +135,7 @@ function copyFavicon(name: string, slug: string) {
 export async function generateWebsite() {
   const db = await getDb();
   const config = await getWebsiteConfig();
-  if (!config.sites.length) throw new Error("没有可生成的网站");
+  if (!config.sites.length) throw new Error("There is no website to generate");
   const catalogs: Record<string, { menus: { name: string; nameEn: string; url: string }[]; products: Record<string, unknown>[] }> = {};
   for (const site of config.sites) {
     const key = String(site.catalogId);

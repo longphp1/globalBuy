@@ -106,8 +106,8 @@ export async function getHiobuyConfig() {
 export async function saveHiobuyConfig(input: { apiKey?: string; apiBase?: string }) {
   const apiKey = String(input.apiKey ?? "").trim();
   const apiBase = String(input.apiBase ?? "").trim().replace(/\/$/, "");
-  if (!apiKey) throw new Error("请填写 API Key");
-  if (!/^https?:\/\//i.test(apiBase)) throw new Error("请填写有效的接口地址");
+  if (!apiKey) throw new Error("Enter an API key");
+  if (!/^https?:\/\//i.test(apiBase)) throw new Error("Enter a valid API address");
   const db = await getDb();
   const write = db.prepare("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
   write.run("hiobuy_api_key", apiKey);

@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Site } from "@/lib/types";
 import { JoinProvider } from "@/components/JoinDialog";
 
-export function SiteFrame({ site, children }: { site: Site; children: React.ReactNode }) {
+export function SiteFrame({ site, children, showManage = false }: { site: Site; children: React.ReactNode; showManage?: boolean }) {
   return (
     <JoinProvider siteName={site.name} siteUrl={site.url}>
       <header>
@@ -21,6 +21,11 @@ export function SiteFrame({ site, children }: { site: Site; children: React.Reac
             <a href={site.url} className="btn" target="_blank" rel="noreferrer">
               <span className="inner">Join the {site.name}</span>
             </a>
+            {showManage ? (
+              <Link href="/admin/products" className="btn">
+                <span className="inner">Manage WebSite</span>
+              </Link>
+            ) : null}
           </div>
         </div>
       </header>

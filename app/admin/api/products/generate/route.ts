@@ -13,6 +13,6 @@ export async function POST() {
     return NextResponse.json(result);
   } catch (error) {
     revalidatePath("/", "layout");
-    return NextResponse.json({ message: error instanceof Error ? error.message : "更新失败" }, { status: 400 });
+    return NextResponse.json({ message: error instanceof Error ? error.message : "Update failed" }, { status: 400 });
   }
 }

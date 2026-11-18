@@ -10,6 +10,6 @@ export async function POST(request: Request) {
     const count = await changeBrand(body.oldBrand ?? "", body.newBrand ?? "");
     return NextResponse.json({ count });
   } catch (error) {
-    return NextResponse.json({ message: error instanceof Error ? error.message : "修改失败" }, { status: 400 });
+    return NextResponse.json({ message: error instanceof Error ? error.message : "Update failed" }, { status: 400 });
   }
 }

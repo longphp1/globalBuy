@@ -32,7 +32,7 @@ function runGit(args: string[], description: string, timeout = 120000): Promise<
         const output = `${stdout ?? ""}${stderr ?? ""}`.trim();
         if (error) {
           const killed = "killed" in error && error.killed;
-          reject(new Error(`${description}失败${killed ? "（超时）" : ""}: ${output || error.message}`));
+          reject(new Error(`${description} failed${killed ? " (timed out)" : ""}: ${output || error.message}`));
           return;
         }
         resolve({ description, output });
@@ -43,14 +43,14 @@ function runGit(args: string[], description: string, timeout = 120000): Promise<
 
 async function syncMain() {
   if (!fs.existsSync(path.join(process.cwd(), ".git"))) {
-    throw new Error("当前目录不是 git 仓库，无法更新网站");
+    throw new Error("This directory is not a git repository, so the website cannot be updated");
   }
   const steps: Array<[string[], string]> = [
-    [["reset", "--hard", "HEAD"], "重置本地仓库到最新提交"],
-    [["clean", "-fd"], "清除本地未跟踪文件"],
-    [["checkout", "main"], "切换到分支 main"],
-    [["clean", "-fd"], "清除本地未跟踪文件"],
-    [["pull", "--no-edit", "origin", "main"], "拉取远程仓库最新代码"],
+    [["reset", "--hard", "HEAD"], "Reset the local repository to the latest commit"],
+    [["clean", "-fd"], "Remove untracked files"],
+    [["checkout", "main"], "Switch to branch main"],
+    [["clean", "-fd"], "Remove untracked files"],
+    [["pull", "--no-edit", "origin", "main"], "Pull the latest code from the remote repository"],
   ];
   const done: GitResult[] = [];
   for (const [args, description] of steps) {
@@ -60,14 +60,14 @@ async function syncMain() {
 }
 
 async function commitAndPush() {
-  await runGit(["add", "."], "添加所有更改到暂存区");
-  const status = await runGit(["status", "--porcelain"], "检查变更");
+  await runGit(["add", "."], "Stage all changes");
+  const status = await runGit(["status", "--porcelain"], "Check for changes");
   if (!status.output) {
     return { committed: false, pushed: false, commit: "" };
   }
   const commit = `System auto push platform code time:${stamp()}`;
-  await runGit(["commit", "-m", commit], "提交更改到本地仓库");
-  await runGit(["push", "origin", "main"], "推送到远程仓库", 180000);
+  await runGit(["commit", "-m", commit], "Commit changes to the local repository");
+  await runGit(["push", "origin", "main"], "Push to the remote repository", 180000);
   return { committed: true, pushed: true, commit };
 }
 
@@ -77,19 +77,19 @@ export async function publishWebsite() {
   try {
     generated = await generateWebsite();
   } catch (error) {
-    const message = error instanceof Error ? error.message : "生成网站失败";
-    throw new Error(`代码已同步到 main，生成网站失败: ${message}`);
+    const message = error instanceof Error ? error.message : "Website generation failed";
+    throw new Error(`Code is synced to main. Website generation failed: ${message}`);
   }
   try {
     const published = await commitAndPush();
-    const summary = `已更新 ${generated.sites} 个网站、${generated.products} 个商品`;
+    const summary = `Updated ${generated.sites} sites and ${generated.products} products`;
     return {
       ...generated,
       ...published,
-      message: published.pushed ? `${summary}，并已推送到 main` : `${summary}，没有新的代码需要推送`,
+      message: published.pushed ? `${summary}, and pushed to main` : `${summary}. No new code to push`,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "提交失败";
-    throw new Error(`网站已生成（${generated.sites} 个网站、${generated.products} 个商品），推送失败: ${message}`);
+    const message = error instanceof Error ? error.message : "Commit failed";
+    throw new Error(`Website generated (${generated.sites} sites, ${generated.products} products). Push failed: ${message}`);
   }
 }

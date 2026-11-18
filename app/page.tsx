@@ -20,7 +20,7 @@ export default async function HomePage() {
   const site = await homeSite();
   if (!site) notFound();
   return (
-    <SiteFrame site={site}>
+    <SiteFrame site={site} showManage>
       <ProductListing siteSlug={site.slug} menuUrl="home" brand="All" page={1} />
     </SiteFrame>
   );

@@ -10,6 +10,6 @@ export async function POST(request: Request) {
     const count = await deleteProducts(body.ids ?? []);
     return NextResponse.json({ count });
   } catch (error) {
-    return NextResponse.json({ message: error instanceof Error ? error.message : "删除失败" }, { status: 400 });
+    return NextResponse.json({ message: error instanceof Error ? error.message : "Delete failed" }, { status: 400 });
   }
 }

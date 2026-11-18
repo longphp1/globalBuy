@@ -229,7 +229,7 @@ export async function updateProduct(id: number, input: ProductInput) {
 export async function deleteProducts(ids: number[]) {
   const db = await getDb();
   const unique = [...new Set(ids.map(Number).filter((id) => id > 0))];
-  if (!unique.length) throw new Error("请选择要删除的商品");
+  if (!unique.length) throw new Error("Select products to delete");
   const placeholders = unique.map(() => "?").join(",");
   const result = db.prepare(`DELETE FROM products WHERE id IN (${placeholders})`).run(...unique);
   touch(db);
@@ -239,7 +239,7 @@ export async function deleteProducts(ids: number[]) {
 export async function changeBrand(oldBrand: string, newBrand: string) {
   const from = oldBrand.trim();
   const to = cleanBrand(newBrand);
-  if (!from || !to) throw new Error("请填写原品牌和新品牌");
+  if (!from || !to) throw new Error("Enter the original brand and the new brand");
   const db = await getDb();
   const result = db.prepare("UPDATE products SET brand = ?, updated_at = ? WHERE brand = ?").run(to, now(), from);
   touch(db);

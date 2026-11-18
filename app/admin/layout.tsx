@@ -7,10 +7,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="admin-root">
       <header className="admin-top">
-        <Link className="admin-brand" href="/admin/products">网站管理</Link>
+        <Link className="admin-brand" href="/admin/products">Site admin</Link>
         <nav>
-          <Link href="/admin/products">网站商品</Link>
-          <Link href="/">返回网站</Link>
+          <Link href="/admin/products">Products</Link>
+          <Link href="/">Back to site</Link>
         </nav>
       </header>
       <main className="admin-main">{children}</main>
