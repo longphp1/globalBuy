@@ -1,68 +1,33 @@
-import { catalog as jsonCatalog } from "@/lib/catalog";
-import type { Catalog, Product, Site, SiteCatalog } from "@/lib/types";
-import { getDb, revision } from "@/lib/admin/db";
+import fs from "node:fs";
+import path from "node:path";
+import { connection } from "next/server";
+import type { Catalog, Site, SiteCatalog } from "@/lib/types";
 
-export const pageSize = jsonCatalog.pageSize || 50;
+type PublishedCache = { mtimeMs: number; size: number; catalog: Catalog };
 
-let memory: { rev: number; catalog: Catalog } | null = null;
+const globalCache = globalThis as unknown as { publishedCatalog?: PublishedCache };
 
-function text(value: unknown) {
-  return value == null ? "" : String(value);
+function catalogFile() {
+  return path.join(process.cwd(), "data", "catalog.json");
 }
 
-async function buildCatalog(): Promise<Catalog> {
-  const db = await getDb();
-  const configuredSize = Number(db.prepare("SELECT value FROM meta WHERE key = 'website_page_size'").get()?.value);
-  const siteRows = db.prepare("SELECT * FROM sites ORDER BY id").all();
-  const sites = siteRows.map((row) => ({
-    slug: text(row.slug),
-    name: text(row.name),
-    url: text(row.url),
-    title: text(row.title),
-    siteId: String(row.catalog_id),
-  })) satisfies Site[];
-  const menus = db.prepare("SELECT m.*, s.catalog_id FROM menus m JOIN sites s ON s.id = m.site_id ORDER BY m.id").all();
-  const products = db.prepare("SELECT p.*, s.catalog_id FROM products p JOIN sites s ON s.id = p.site_id ORDER BY p.range, p.id").all();
-  const catalogs: Catalog["catalogs"] = {};
-  for (const site of sites) {
-    const siteMenus = menus
-      .filter((menu) => String(menu.catalog_id) === site.siteId)
-      .map((menu) => ({ name: text(menu.name), url: text(menu.url) }));
-    const menuById = new Map(menus.filter((menu) => String(menu.catalog_id) === site.siteId).map((menu) => [Number(menu.id), menu]));
-    const siteProducts: Product[] = products
-      .filter((product) => String(product.catalog_id) === site.siteId)
-      .map((product) => {
-        const menu = menuById.get(Number(product.menu_id));
-        return {
-          id: Number(product.id),
-          slug: text(product.slug),
-          name: text(product.name),
-          price: text(product.price),
-          brand: text(product.brand),
-          menuName: text(menu?.name || "Home"),
-          menuUrl: text(menu?.url || "home"),
-          image: text(product.main_img),
-          sourceProductId: text(product.source_product_id),
-          sourceProductUrl: text(product.source_product_url),
-          taoBuyLink: text(product.tao_buy_link),
-        };
-      });
-    catalogs[site.siteId] = { menus: siteMenus, products: siteProducts };
-  }
-  return {
-    pageSize: configuredSize > 0 ? configuredSize : pageSize,
-    generatedAt: jsonCatalog.generatedAt,
-    sites,
-    catalogs,
-  };
+function emptyCatalog(): Catalog {
+  return { pageSize: 50, generatedAt: "", catalogs: {}, sites: [] };
+}
+
+export function invalidatePublishedCatalog() {
+  globalCache.publishedCatalog = undefined;
 }
 
 export async function readCatalog(): Promise<Catalog> {
-  const db = await getDb();
-  const rev = revision(db);
-  if (memory && memory.rev === rev) return memory.catalog;
-  const catalog = await buildCatalog();
-  memory = { rev, catalog };
+  await connection();
+  const file = catalogFile();
+  if (!fs.existsSync(file)) return emptyCatalog();
+  const stat = fs.statSync(file);
+  const cached = globalCache.publishedCatalog;
+  if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) return cached.catalog;
+  const catalog = JSON.parse(fs.readFileSync(file, "utf8")) as Catalog;
+  globalCache.publishedCatalog = { mtimeMs: stat.mtimeMs, size: stat.size, catalog };
   return catalog;
 }
 
@@ -79,4 +44,9 @@ export async function getSiteCatalog(site: Site): Promise<SiteCatalog> {
 export async function listSites() {
   const catalog = await readCatalog();
   return catalog.sites;
+}
+
+export async function homeSite() {
+  const sites = await listSites();
+  return sites.find((site) => site.slug === "taoobuy") ?? sites[0];
 }

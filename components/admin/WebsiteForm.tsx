@@ -23,7 +23,7 @@ export function WebsiteForm() {
       setPageSize(String(body.pageSize ?? 50));
       setDefaultLanguage(body.defaultLanguage ?? "en");
       setLanguages(body.languages?.length ? body.languages : [{ code: "en", label: "English" }, { code: "zh", label: "中文" }]);
-      setSites(body.sites?.length ? [body.sites[0]] : [emptySite()]);
+      setSites(body.sites?.length ? body.sites : [emptySite()]);
     });
   }, []);
 
@@ -58,8 +58,7 @@ export function WebsiteForm() {
       setMessage(body.message);
       return;
     }
-    const saved = (body.sites ?? []) as WebsiteSite[];
-    setSites(sites.map((site) => saved.find((item) => item.slug === (site.slug.trim().toLowerCase() || site.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")) && item.name === site.name.trim()) ?? site));
+    if (Array.isArray(body.sites) && body.sites.length) setSites(body.sites);
     setRemovedIds([]);
     setMessage("已保存");
   }

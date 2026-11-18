@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { getDb, touch, type SqlDb } from "@/lib/admin/db";
+import { invalidatePublishedCatalog } from "@/lib/store";
 
 export type WebsiteLanguage = { code: string; label: string };
 export type WebsiteSite = { id: number; catalogId: number; slug: string; name: string; url: string; title: string };
@@ -192,7 +193,11 @@ export async function generateWebsite() {
   };
   const dataDir = path.join(process.cwd(), "data");
   fs.mkdirSync(dataDir, { recursive: true });
-  fs.writeFileSync(path.join(dataDir, "catalog.json"), JSON.stringify(payload));
+  const target = path.join(dataDir, "catalog.json");
+  const temp = path.join(dataDir, "catalog.json.tmp");
+  fs.writeFileSync(temp, JSON.stringify(payload));
+  fs.renameSync(temp, target);
+  invalidatePublishedCatalog();
   for (const site of config.sites) copyFavicon(site.name, site.slug);
   writeMeta(db, "website_generated_at", generatedAt);
   touch(db);
