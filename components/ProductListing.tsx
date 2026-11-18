@@ -3,21 +3,15 @@ import { notFound } from "next/navigation";
 import { BrandTags } from "@/components/BrandTags";
 import { FaqList } from "@/components/FaqList";
 import { ProductCard } from "@/components/ProductCard";
-import {
-  brandList,
-  catalog,
-  filterProducts,
-  getSite,
-  getSiteCatalog,
-  listingPath,
-} from "@/lib/catalog";
+import { brandList, filterProducts, listingPath } from "@/lib/catalog";
+import { getSite, getSiteCatalog, readCatalog } from "@/lib/store";
 import type { MenuItem, Site } from "@/lib/types";
 
 export function listingTitle(siteName: string, brand: string) {
   return `${siteName} spreadsheet 2025 Fall/${brand}`;
 }
 
-export function ProductListing({
+export async function ProductListing({
   siteSlug,
   menuUrl,
   brand,
@@ -28,9 +22,9 @@ export function ProductListing({
   brand: string;
   page: number;
 }) {
-  const site = getSite(siteSlug);
+  const site = await getSite(siteSlug);
   if (!site || page < 1) notFound();
-  const data = getSiteCatalog(site);
+  const data = await getSiteCatalog(site);
   const menu = data.menus.find((item) => item.url === menuUrl);
   if (!menu && menuUrl !== "home") notFound();
   const menuName = menu?.name ?? "Home";
@@ -38,10 +32,10 @@ export function ProductListing({
   if (!brands.includes(brand)) notFound();
 
   const filtered = filterProducts(data.products, menuUrl, brand);
-  const pageSize = catalog.pageSize || 50;
-  const maxPage = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const size = (await readCatalog()).pageSize || 50;
+  const maxPage = Math.max(1, Math.ceil(filtered.length / size));
   if (page > maxPage) notFound();
-  const items = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const items = filtered.slice((page - 1) * size, page * size);
 
   return (
     <>

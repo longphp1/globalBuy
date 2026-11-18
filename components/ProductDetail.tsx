@@ -2,19 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BuyActions } from "@/components/BuyActions";
 import { RelatedCard } from "@/components/ProductCard";
-import {
-  findProduct,
-  getSite,
-  getSiteCatalog,
-  listingPath,
-  relatedProducts,
-} from "@/lib/catalog";
+import { findProduct, listingPath, relatedProducts } from "@/lib/catalog";
+import { getSite, getSiteCatalog } from "@/lib/store";
 import type { MenuItem } from "@/lib/types";
 
-export function ProductDetail({ siteSlug, slug }: { siteSlug: string; slug: string }) {
-  const site = getSite(siteSlug);
+export async function ProductDetail({ siteSlug, slug }: { siteSlug: string; slug: string }) {
+  const site = await getSite(siteSlug);
   if (!site) notFound();
-  const data = getSiteCatalog(site);
+  const data = await getSiteCatalog(site);
   const product = findProduct(data.products, slug);
   if (!product) notFound();
   const related = relatedProducts(data.products, product);

@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ProductListing, listingTitle } from "@/components/ProductListing";
 import { SiteFrame } from "@/components/SiteFrame";
-import { getSite } from "@/lib/catalog";
+import { getSite } from "@/lib/store";
 
 const HOME_SITE = "taoobuy";
 
-export function generateMetadata(): Metadata {
-  const site = getSite(HOME_SITE);
+export async function generateMetadata(): Promise<Metadata> {
+  const site = await getSite(HOME_SITE);
   if (!site) {
     return { title: "TaooBuy Spreadsheet" };
   }
@@ -18,8 +18,8 @@ export function generateMetadata(): Metadata {
   };
 }
 
-export default function HomePage() {
-  const site = getSite(HOME_SITE);
+export default async function HomePage() {
+  const site = await getSite(HOME_SITE);
   if (!site) notFound();
   return (
     <SiteFrame site={site}>

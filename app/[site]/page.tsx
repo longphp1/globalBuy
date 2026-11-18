@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ProductListing, listingTitle } from "@/components/ProductListing";
-import { getSite } from "@/lib/catalog";
+import { getSite } from "@/lib/store";
 
 export async function generateMetadata({
   params,
@@ -8,7 +8,7 @@ export async function generateMetadata({
   params: Promise<{ site: string }>;
 }): Promise<Metadata> {
   const { site: slug } = await params;
-  const site = getSite(slug);
+  const site = await getSite(slug);
   return { title: site ? listingTitle(site.name, "All") : "Spreadsheet" };
 }
 

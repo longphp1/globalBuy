@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { SiteFrame } from "@/components/SiteFrame";
-import { getSite } from "@/lib/catalog";
+import { getSite } from "@/lib/store";
 import { notFound } from "next/navigation";
 
 export async function generateMetadata({
@@ -9,7 +9,7 @@ export async function generateMetadata({
   params: Promise<{ site: string }>;
 }): Promise<Metadata> {
   const { site: slug } = await params;
-  const site = getSite(slug);
+  const site = await getSite(slug);
   if (!site) return {};
   return {
     title: `${site.name} Spreadsheet`,
@@ -26,7 +26,7 @@ export default async function SiteLayout({
   params: Promise<{ site: string }>;
 }) {
   const { site: slug } = await params;
-  const site = getSite(slug);
+  const site = await getSite(slug);
   if (!site) notFound();
   return <SiteFrame site={site}>{children}</SiteFrame>;
 }

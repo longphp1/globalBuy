@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { catalog } from "@/lib/catalog";
+import { listSites } from "@/lib/store";
 
 export const metadata: Metadata = {
   title: "Global Buy Spreadsheets",
   description: "Shopping spreadsheets for Acbuy, Cnfans, Kakobuy, Mulebuy, TaooBuy, and Weidian.",
 };
 
-export default function SpreadsheetPage() {
+export default async function SpreadsheetPage() {
+  const sites = await listSites();
   return (
     <>
       <header>
@@ -26,7 +27,7 @@ export default function SpreadsheetPage() {
             <p>Choose an agent spreadsheet. Each one keeps the same finds, categories, and buying flow.</p>
           </div>
         </div>
-        {catalog.sites.length === 0 ? (
+        {sites.length === 0 ? (
           <div className="container extension">
             <div className="text">
               Run php artisan generate:website_next in the lpadmin project to fill this site.
@@ -34,7 +35,7 @@ export default function SpreadsheetPage() {
           </div>
         ) : (
           <div className="list">
-            {catalog.sites.map((site) => (
+            {sites.map((site) => (
               <Link key={site.slug} href={`/${site.slug}`} className="item">
                 <div className="bottom">
                   <div className="name">{site.name} Spreadsheet</div>
