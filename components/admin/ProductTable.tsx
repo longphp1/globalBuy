@@ -18,7 +18,7 @@ type Product = {
 
 type Meta = { menus: { id: number; name: string }[]; brands: string[] };
 
-export function ProductTable() {
+export function ProductTable({ canUpdate = true }: { canUpdate?: boolean }) {
   const [meta, setMeta] = useState<Meta>({ menus: [], brands: [] });
   const [rows, setRows] = useState<Product[]>([]);
   const [total, setTotal] = useState(0);
@@ -87,6 +87,7 @@ export function ProductTable() {
   }
 
   async function generateProject() {
+    if (!canUpdate) return;
     if (!window.confirm("This discards uncommitted local changes, pulls the latest main branch, regenerates the website, and pushes it to the remote repository. Update the website?")) return;
     setGenerating(true);
     setMessage("");
@@ -180,7 +181,7 @@ export function ProductTable() {
         <div className="admin-actions" style={{ marginBottom: 12 }}>
           <button className="admin-btn" type="button" onClick={openConfig}>HioBuy settings</button>
           <Link className="admin-link ghost" href="/admin/products/website">Website settings</Link>
-          <button className="admin-btn" type="button" disabled={generating} onClick={generateProject}>{generating ? "Updating" : "Update website"}</button>
+          <button className="admin-btn" type="button" disabled={!canUpdate || generating} title={canUpdate ? undefined : "Update website runs on the local machine"} onClick={generateProject}>{generating ? "Updating" : "Update website"}</button>
         </div>
         <div className="admin-actions" style={{ marginBottom: 12 }}>
           <Link className="admin-link" href="/admin/products/new">Add product</Link>

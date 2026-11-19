@@ -56,7 +56,7 @@ Vercel 的运行目录是只读的，不能创建或修改 `data/admin.sqlite`�
 3. 在 Vercel 项目里安装 [Supabase](https://vercel.com/marketplace/supabase) 集成，并选中要使用的 Supabase 项目。集成写入的 `POSTGRES_URL`，或带前缀的 `WEIDIAN_POSTGRES_URL`，程序都会读取。也可以改为在环境变量里设置 `SUPABASE_DB_URL`，值用 Supabase 控制台里的数据库连接串（Database → Connection string，选 Transaction pooler）。
 4. 重新部署一次，让连接串进入运行环境。确认仓库里包含 `data/catalog.json` 和 `public/`。商品图在 `public` 下。
 5. 打开线上的 `/admin/products`。第一次进入会把 `catalog.json` 里的站点和商品写入 Supabase。之后新增、修改、删除和查询都走这张库。
-6. 在线上点 **Update website** 时，不再执行 git 提交，只把当前商品写入 Supabase。首页、站点页和商品详情不读这张库，它们是用 `data/catalog.json` 生成的静态页面。要更新这些页面，在本机点 **Update website**，推送后的重新部署会带上新的静态文件。
+6. 部署到 Vercel 后，**Update website** 按钮不能点击，接口也不会执行生成。首页、站点页和商品详情不读 Supabase，它们是用 `data/catalog.json` 生成的静态页面。要更新这些页面，在本机点 **Update website**，推送后的重新部署会带上新的静态文件。
 
 HioBuy 密钥保存在当前环境使用的数据库里。换到 Supabase 后要在 **HioBuy settings** 里重新保存一次。`HIOBUY_API_KEY` 和 `HIOBUY_API_BASE` 仍可作为环境变量备用。
 
@@ -164,14 +164,14 @@ Authorization: Bearer YOUR_API_KEY
 | --- | --- |
 | `title.translated`，没有则用 `title.original` | 商品名称 |
 | `price.promotion_amount`，其次 `display_amount`，再其次 `original_amount` | 价格 |
-| `images` 里 `type` 为 `main` 的 `url` | 主图 |
+| `images` 里 `type` 为 `main` 的 `url` | 主图。这是图片地址时，会下载并保存为 `public/products/{商品 slug}/main.png` |
 | 其余图片 `url`，逗号拼接 | 附图 |
 | `channel`：`weidian` 记为 `WD`，`taobao` 记为 `TB`，1688 保留 `1688` | 来源 |
 | `metadata.brand` | 品牌 |
 | `source_product_id` | 来源商品 ID |
 | `source_url`，没有则用用户粘贴的链接 | 原始链接，也作为主购买链接 |
 
-名称或价格缺失时，这次查询记为失败，不会写入半条商品。查到的结果只填进表单，还要点保存才会写入当前数据库：本机是 SQLite，Vercel 是 Supabase。公开站要再点 **Update website** 才会更新。
+名称或价格缺失时，这次查询记为失败，不会写入半条商品。查到主图地址后，会立刻下载并保存为 `public/products/{商品 slug}/main.png`，表单里的主图改为 `/products/{商品 slug}/main.png`。新增商品、修改商品和导入商品时，主图只要是网址，也会保存到同一位置。查到的其他结果只填进表单，还要点保存才会写入当前数据库：本机是 SQLite，Vercel 是 Supabase。公开站要在本机点 **Update website** 才会更新。Vercel 的目录是只读的，线上新增或导入不能把图片写入 `public/products`，这类操作放在本机完成。
 
 ## 三、商品详情页的操作
 

@@ -1,4 +1,5 @@
-import { getDb } from "@/lib/admin/db";
+import { getDb, uniqueSlug } from "@/lib/admin/db";
+import { storeMainImage } from "@/lib/admin/images";
 
 type SourceProduct = {
   name: string;
@@ -149,7 +150,10 @@ export async function fetchProductByUrl(rawUrl: string): Promise<SourceProduct> 
   if (!response.ok) throw new Error(errorMessage(body, response.status));
   const product = body.product;
   if (!product || typeof product !== "object") throw new Error("商品接口未返回商品信息");
-  return mapProduct(product as Record<string, unknown>, url);
+  const mapped = mapProduct(product as Record<string, unknown>, url);
+  const db = await getDb();
+  mapped.main_img = await storeMainImage(await uniqueSlug(db, mapped.name), mapped.main_img);
+  return mapped;
 }
 
 export async function fetchProductsByUrls(urls: string[], concurrency = 5) {

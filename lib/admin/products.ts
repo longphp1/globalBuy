@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import { getDb, now, touch, uniqueSlug, type SqlDb } from "@/lib/admin/db";
+import { storeMainImage } from "@/lib/admin/images";
 import { fetchProductsByUrls } from "@/lib/admin/source";
 
 export type ProductInput = {
@@ -193,6 +194,7 @@ async function normalize(input: ProductInput, db: SqlDb, id = 0) {
 export async function createProduct(input: ProductInput) {
   const db = await getDb();
   const data = await normalize(input, db);
+  data.main_img = await storeMainImage(data.slug, data.main_img);
   const result = await db.prepare(`INSERT INTO products (
     site_id, menu_id, page, range, name, price, brand, source, source_product_id, source_product_url,
     main_img, img, main_buy_link, main_buy_platform, other_buy_link, other_buy_platform, note_link,
@@ -212,6 +214,8 @@ export async function updateProduct(id: number, input: ProductInput) {
   const current = await db.prepare("SELECT id, slug, created_at FROM products WHERE id = ?").get(id);
   if (!current) return null;
   const data = await normalize(input, db, id);
+  const slug = text(current.slug) || data.slug;
+  data.main_img = await storeMainImage(slug, data.main_img);
   await db.prepare(`UPDATE products SET
     site_id=?, menu_id=?, page=?, range=?, name=?, price=?, brand=?, source=?, source_product_id=?,
     source_product_url=?, main_img=?, img=?, main_buy_link=?, main_buy_platform=?, other_buy_link=?,
@@ -220,7 +224,7 @@ export async function updateProduct(id: number, input: ProductInput) {
     data.site_id, data.menu_id, data.page, data.range, data.name, data.price, data.brand, data.source,
     data.source_product_id, data.source_product_url, data.main_img, data.img, data.main_buy_link,
     data.main_buy_platform, data.other_buy_link, data.other_buy_platform, data.note_link, data.note_content,
-    data.tao_buy_platform, data.tao_buy_link, text(current.slug) || data.slug, data.updated_at, id,
+    data.tao_buy_platform, data.tao_buy_link, slug, data.updated_at, id,
   );
   await touch(db);
   return getProduct(id);
@@ -367,56 +371,62 @@ async function writeImported(items: Record<string, string | number>[]) {
   let updated = 0;
   let skipped = 0;
   const stamp = now();
+  const ready: { existingId: number; payload: Record<string, string | number> }[] = [];
+  for (const item of items) {
+    const name = text(item.name).trim();
+    const price = text(item.price).trim();
+    if (!name || !price) {
+      skipped += 1;
+      continue;
+    }
+    const menu = await db.prepare("SELECT id, site_id FROM menus WHERE name = ? ORDER BY id LIMIT 1").get(text(item.menuName));
+    if (!menu) {
+      skipped += 1;
+      continue;
+    }
+    const sourceUrl = text(item.source_product_url || item.main_buy_link);
+    const parsed = sourceUrl ? sourceFromUrl(sourceUrl) : { source: "", source_product_id: "", platform: "" };
+    const existing = await db.prepare("SELECT id, slug FROM products WHERE name = ?").get(name);
+    const slug = existing ? text(existing.slug) : await uniqueSlug(db, name);
+    const payload = {
+      site_id: Number(menu.site_id),
+      menu_id: Number(menu.id),
+      name,
+      price,
+      brand: text(item.brand),
+      main_img: await storeMainImage(slug, text(item.main_img)),
+      img: text(item.img),
+      source: text(item.source) || parsed.source,
+      source_product_id: text(item.source_product_id) || parsed.source_product_id,
+      source_product_url: sourceUrl,
+      main_buy_link: text(item.main_buy_link) || sourceUrl,
+      main_buy_platform: text(item.main_buy_platform) || parsed.platform || "weidian",
+      other_buy_link: text(item.other_buy_link),
+      other_buy_platform: text(item.other_buy_platform),
+      note_link: text(item.note_link),
+      note_content: text(item.note_content),
+      tao_buy_platform: text(item.tao_buy_link) ? "Open TaooBuy Link" : "",
+      tao_buy_link: text(item.tao_buy_link),
+      slug,
+    };
+    ready.push({ existingId: existing ? Number(existing.id) : 0, payload });
+  }
   await db.exec("BEGIN");
   try {
-    for (const item of items) {
-      const name = text(item.name).trim();
-      const price = text(item.price).trim();
-      if (!name || !price) {
-        skipped += 1;
-        continue;
-      }
-      const menu = await db.prepare("SELECT id, site_id FROM menus WHERE name = ? ORDER BY id LIMIT 1").get(text(item.menuName));
-      if (!menu) {
-        skipped += 1;
-        continue;
-      }
-      const sourceUrl = text(item.source_product_url || item.main_buy_link);
-      const parsed = sourceUrl ? sourceFromUrl(sourceUrl) : { source: "", source_product_id: "", platform: "" };
-      const existing = await db.prepare("SELECT id, range FROM products WHERE name = ?").get(name);
-      const payload = {
-        site_id: Number(menu.site_id),
-        menu_id: Number(menu.id),
-        name,
-        price,
-        brand: text(item.brand),
-        main_img: text(item.main_img),
-        img: text(item.img),
-        source: text(item.source) || parsed.source,
-        source_product_id: text(item.source_product_id) || parsed.source_product_id,
-        source_product_url: sourceUrl,
-        main_buy_link: text(item.main_buy_link) || sourceUrl,
-        main_buy_platform: text(item.main_buy_platform) || parsed.platform || "weidian",
-        other_buy_link: text(item.other_buy_link),
-        other_buy_platform: text(item.other_buy_platform),
-        note_link: text(item.note_link),
-        note_content: text(item.note_content),
-        tao_buy_platform: text(item.tao_buy_link) ? "Open TaooBuy Link" : "",
-        tao_buy_link: text(item.tao_buy_link),
-      };
-      if (existing) {
+    for (const item of ready) {
+      const payload = item.payload;
+      if (item.existingId) {
         await db.prepare(`UPDATE products SET brand=?, price=?, main_img=?, img=?, source=?, source_product_id=?,
           source_product_url=?, main_buy_link=?, main_buy_platform=?, other_buy_link=?, other_buy_platform=?,
           note_link=?, note_content=?, tao_buy_platform=?, tao_buy_link=?, updated_at=? WHERE id=?`).run(
           payload.brand, payload.price, payload.main_img, payload.img, payload.source, payload.source_product_id,
           payload.source_product_url, payload.main_buy_link, payload.main_buy_platform, payload.other_buy_link,
           payload.other_buy_platform, payload.note_link, payload.note_content, payload.tao_buy_platform,
-          payload.tao_buy_link, stamp, Number(existing.id),
+          payload.tao_buy_link, stamp, item.existingId,
         );
         updated += 1;
       } else {
         const maxRange = Number((await db.prepare("SELECT MAX(range) AS range FROM products WHERE menu_id = ?").get(payload.menu_id))?.range ?? 0) + 1;
-        const slug = await uniqueSlug(db, payload.name);
         await db.prepare(`INSERT INTO products (
           site_id, menu_id, page, range, name, price, brand, source, source_product_id, source_product_url,
           main_img, img, main_buy_link, main_buy_platform, other_buy_link, other_buy_platform, note_link,
@@ -426,7 +436,7 @@ async function writeImported(items: Record<string, string | number>[]) {
           payload.brand, payload.source, payload.source_product_id, payload.source_product_url, payload.main_img,
           payload.img, payload.main_buy_link, payload.main_buy_platform, payload.other_buy_link, payload.other_buy_platform,
           payload.note_link, payload.note_content, payload.tao_buy_platform, payload.tao_buy_link,
-          slug, stamp, stamp,
+          payload.slug, stamp, stamp,
         );
         created += 1;
       }
@@ -454,36 +464,46 @@ async function importBySourceUrl(rows: (string | number | null)[][], siteId: num
   let updated = 0;
   const failed = [...fetched.skipped];
   const stamp = now();
+  const ready: { existingId: number; slug: string; mainImg: string; product: NonNullable<(typeof fetched.results)[number]["product"]> }[] = [];
+  for (const item of fetched.results) {
+    if (!item.success || !item.product) {
+      failed.push({ url: item.url, error: item.error || "未知错误" });
+      continue;
+    }
+    const product = item.product;
+    const existing = await db.prepare(`SELECT id, slug FROM products WHERE site_id = ? AND menu_id = ? AND (
+      (source_product_id != '' AND source_product_id = ?) OR (source_product_url != '' AND source_product_url = ?)
+    )`).get(siteId, menuId, product.source_product_id, product.source_product_url);
+    const slug = existing ? text(existing.slug) : await uniqueSlug(db, product.name);
+    ready.push({
+      existingId: existing ? Number(existing.id) : 0,
+      slug,
+      mainImg: await storeMainImage(slug, product.main_img),
+      product,
+    });
+  }
   await db.exec("BEGIN");
   try {
-    for (const item of fetched.results) {
-      if (!item.success || !item.product) {
-        failed.push({ url: item.url, error: item.error || "未知错误" });
-        continue;
-      }
+    for (const item of ready) {
       const product = item.product;
-      const existing = await db.prepare(`SELECT id FROM products WHERE site_id = ? AND menu_id = ? AND (
-        (source_product_id != '' AND source_product_id = ?) OR (source_product_url != '' AND source_product_url = ?)
-      )`).get(siteId, menuId, product.source_product_id, product.source_product_url);
-      if (existing) {
+      if (item.existingId) {
         await db.prepare(`UPDATE products SET name=?, brand=?, price=?, source=?, source_product_id=?, source_product_url=?,
           main_img=?, img=?, main_buy_link=?, main_buy_platform=?, updated_at=? WHERE id=?`).run(
           product.name, product.brand, product.price, product.source, product.source_product_id,
-          product.source_product_url, product.main_img, product.img, product.main_buy_link,
-          product.main_buy_platform, stamp, Number(existing.id),
+          product.source_product_url, item.mainImg, product.img, product.main_buy_link,
+          product.main_buy_platform, stamp, item.existingId,
         );
         updated += 1;
       } else {
         const maxRange = Number((await db.prepare("SELECT MAX(range) AS range FROM products WHERE site_id = ? AND menu_id = ?").get(siteId, menuId))?.range ?? 0) + 1;
-        const slug = await uniqueSlug(db, product.name);
         await db.prepare(`INSERT INTO products (
           site_id, menu_id, page, range, name, price, brand, source, source_product_id, source_product_url,
           main_img, img, main_buy_link, main_buy_platform, other_buy_link, other_buy_platform, note_link,
           note_content, tao_buy_platform, tao_buy_link, slug, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '', '', '', '', '', ?, ?, ?)`).run(
           siteId, menuId, Math.ceil(maxRange / 100), maxRange, product.name, product.price, product.brand,
-          product.source, product.source_product_id, product.source_product_url, product.main_img, product.img,
-          product.main_buy_link, product.main_buy_platform, slug, stamp, stamp,
+          product.source, product.source_product_id, product.source_product_url, item.mainImg, product.img,
+          product.main_buy_link, product.main_buy_platform, item.slug, stamp, stamp,
         );
         created += 1;
       }

@@ -56,7 +56,7 @@ The Vercel runtime filesystem is read-only, so it cannot create or modify `data/
 3. Install the [Supabase](https://vercel.com/marketplace/supabase) integration on the Vercel project and select the Supabase project. The app reads either `POSTGRES_URL` or the prefixed `WEIDIAN_POSTGRES_URL`. You can instead set `SUPABASE_DB_URL` to the connection string from the Supabase dashboard (Database → Connection string, Transaction pooler).
 4. Redeploy once so the connection string is available at runtime. The repository must include `data/catalog.json` and `public/`. Product images live under `public`.
 5. Open the live `/admin/products` page. The first visit imports the sites and products from `catalog.json` into Supabase. Later creates, updates, deletes, and queries use that database.
-6. On Vercel, **Update website** does not run git. It writes the current products to Supabase only. The home page, site pages, and product details do not read that database. They are static pages built from `data/catalog.json`. To refresh them, click **Update website** on the local machine. The redeploy after that push includes the new static files.
+6. After the app is deployed on Vercel, the **Update website** button cannot be clicked, and the generate request is not run. The home page, site pages, and product details do not read Supabase. They are static pages built from `data/catalog.json`. To refresh them, click **Update website** on the local machine. The redeploy after that push includes the new static files.
 
 The HioBuy key is stored in whichever database the current environment uses. After switching to Supabase, save it again in **HioBuy settings**. `HIOBUY_API_KEY` and `HIOBUY_API_BASE` remain available as environment-variable fallbacks.
 
@@ -164,14 +164,14 @@ On failure, the page shows the `message` returned by the API. Common statuses: 4
 | --- | --- |
 | `title.translated`, or `title.original` when the translation is missing | Product name |
 | `price.promotion_amount`, then `display_amount`, then `original_amount` | Price |
-| `url` of the image whose `type` is `main` | Main image |
+| `url` of the image whose `type` is `main` | Main image. A remote URL is downloaded and saved as `public/products/{product slug}/main.png` |
 | The other image `url` values, joined with commas | Extra images |
 | `channel`: `weidian` is stored as `WD`, `taobao` as `TB`, and 1688 stays `1688` | Source |
 | `metadata.brand` | Brand |
 | `source_product_id` | Source product ID |
 | `source_url`, or the link the user pasted | Original link, also used as the main buy link |
 
-If the name or the price is missing, that lookup fails and no partial product is stored. A successful lookup only fills the form. It is written to the current database after Save: SQLite locally, Supabase on Vercel. The public site updates after **Update website**.
+If the name or the price is missing, that lookup fails and no partial product is stored. When the main image is a remote URL, it is downloaded immediately and saved as `public/products/{product slug}/main.png`. The form then stores `/products/{product slug}/main.png`. Creating, editing, and importing a product do the same whenever the main image is a URL. The other looked-up fields only fill the form and are written after Save: SQLite locally, Supabase on Vercel. The public site updates after **Update website** on the local machine. The Vercel filesystem is read-only, so creating or importing a product there cannot write `public/products`. Do that on the local machine.
 
 ## 3. Product detail actions
 

@@ -7,6 +7,9 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 export async function POST() {
+  if (process.env.VERCEL) {
+    return NextResponse.json({ message: "Update website runs on the local machine" }, { status: 400 });
+  }
   try {
     const result = await publishWebsite();
     revalidatePath("/", "layout");
