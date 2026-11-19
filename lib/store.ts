@@ -1,11 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
-import { connection } from "next/server";
 import type { Catalog, Site, SiteCatalog } from "@/lib/types";
 
 type PublishedCache = { key: string; catalog: Catalog };
 
-const globalCache = globalThis as unknown as { publishedCatalog?: PublishedCache };
+const globalCache = globalThis as unknown as {
+  publishedCatalog?: PublishedCache;
+  catalogRead?: Promise<Catalog>;
+};
 
 function usesSupabase() {
   return process.env.VERCEL === "1";
@@ -21,10 +23,19 @@ function emptyCatalog(): Catalog {
 
 export function invalidatePublishedCatalog() {
   globalCache.publishedCatalog = undefined;
+  globalCache.catalogRead = undefined;
 }
 
-export async function readCatalog(): Promise<Catalog> {
-  await connection();
+export function readCatalog(): Promise<Catalog> {
+  if (!globalCache.catalogRead) {
+    globalCache.catalogRead = loadCatalog().finally(() => {
+      globalCache.catalogRead = undefined;
+    });
+  }
+  return globalCache.catalogRead;
+}
+
+async function loadCatalog(): Promise<Catalog> {
   if (usesSupabase()) {
     const { readPublishedCatalog } = await import("@/lib/admin/db");
     const published = await readPublishedCatalog();
