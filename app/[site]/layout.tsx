@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
 import { SiteFrame } from "@/components/SiteFrame";
+import { catalog } from "@/lib/catalog-data";
 import { getSite } from "@/lib/store";
 import { notFound } from "next/navigation";
+
+export const revalidate = 86400;
+
+export function generateStaticParams() {
+  return catalog.sites.map((site) => ({ site: site.slug }));
+}
 
 export async function generateMetadata({
   params,

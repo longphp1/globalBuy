@@ -33,7 +33,7 @@ npm start
 | `data/catalog.json` | 仓库里的公开站快照。Supabase 里还没有发布快照时，线上页面用它回退。 |
 | `public/` | 样式、字体、平台图标和商品图片。部署时要带上。 |
 
-改完商品或网站配置后，公开页不会立刻变化。要点后台的 **Update website** 生成新的快照。本机会把快照写入 `data/catalog.json` 并推到 `main`。Vercel 上会把快照写入 Supabase，公开页面随后直接读取这份快照。
+改完商品或网站配置后，公开页不会立刻变化。公开页面只读取仓库里的 `data/catalog.json`，构建成静态页面，打开时不连接 Supabase。本机点 **Update website** 会重新生成这个文件并推到 `main`，Vercel 随之重新构建静态页面。线上后台的新增和修改只写入 Supabase。
 
 本机上，这个按钮会按顺序执行：
 
@@ -56,7 +56,7 @@ Vercel 的运行目录是只读的，不能创建或修改 `data/admin.sqlite`�
 3. 在 Vercel 项目里安装 [Supabase](https://vercel.com/marketplace/supabase) 集成，并选中要使用的 Supabase 项目。集成写入的 `POSTGRES_URL`，或带前缀的 `WEIDIAN_POSTGRES_URL`，程序都会读取。也可以改为在环境变量里设置 `SUPABASE_DB_URL`，值用 Supabase 控制台里的数据库连接串（Database → Connection string，选 Transaction pooler）。
 4. 重新部署一次，让连接串进入运行环境。确认仓库里包含 `data/catalog.json` 和 `public/`。商品图在 `public` 下。
 5. 打开线上的 `/admin/products`。第一次进入会把 `catalog.json` 里的站点和商品写入 Supabase。之后新增、修改、删除和查询都走这张库。
-6. 在线上点 **Update website** 时，不再执行 git 提交。它把当前商品生成到 Supabase 的发布快照，首页和详情页接着读取这份快照。本机的这个按钮仍按原来的 git 流程推送 `main`。
+6. 在线上点 **Update website** 时，不再执行 git 提交，只把当前商品写入 Supabase。首页、站点页和商品详情不读这张库，它们是用 `data/catalog.json` 生成的静态页面。要更新这些页面，在本机点 **Update website**，推送后的重新部署会带上新的静态文件。
 
 HioBuy 密钥保存在当前环境使用的数据库里。换到 Supabase 后要在 **HioBuy settings** 里重新保存一次。`HIOBUY_API_KEY` 和 `HIOBUY_API_BASE` 仍可作为环境变量备用。
 
@@ -99,7 +99,7 @@ postgres://postgres.<项目ID>:<数据库密码>@aws-1-us-east-1.pooler.supabase
 
 已经通过集成连上数据库时，不需要再新建 `SUPABASE_DB_URL`。确认 **Environment Variables** 里 Production 和 Preview 都有 `WEIDIAN_POSTGRES_URL`，然后重新部署一次。部署完成后再打开线上的 `/admin/products`。
 
-第一次打开后台时，程序会在 Supabase 里创建 `sites`、`menus`、`products`、`meta` 四张表，并把仓库中的 `data/catalog.json` 导入进去。不需要在 Supabase 的 Table Editor 里手工建表。之后的查询、新增、修改和删除都写入这四张表。点 **Update website** 后，发布快照写入 `meta.published_catalog`，公开页面优先读这份快照；还没有快照时继续读仓库里的 `catalog.json`。
+第一次打开后台时，程序会在 Supabase 里创建 `sites`、`menus`、`products`、`meta` 四张表，并把仓库中的 `data/catalog.json` 导入进去。不需要在 Supabase 的 Table Editor 里手工建表。之后后台的查询、新增、修改和删除都写入这四张表。公开页面不读取这些表。
 
 ## 二、对接 HioBuy 查询商品
 
@@ -175,7 +175,7 @@ Authorization: Bearer YOUR_API_KEY
 
 ## 三、商品详情页的操作
 
-详情页地址是 `/{站点 slug}/products/{商品 slug}`，例如首页商品卡片点进去的页面。本机数据来自已发布的 `catalog.json`。Vercel 上优先读取 Supabase 里的发布快照，没有快照时回退到 `catalog.json`。
+详情页地址是 `/{站点 slug}/products/{商品 slug}`，例如首页商品卡片点进去的页面。页面数据来自已发布的 `catalog.json`，不连接数据库。
 
 ### 浏览和跳转
 

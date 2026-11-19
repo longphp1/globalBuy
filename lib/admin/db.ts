@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { catalog as seedCatalog } from "@/lib/catalog";
+import { catalog as seedCatalog } from "@/lib/catalog-data";
 import type { Catalog } from "@/lib/types";
 import type postgres from "postgres";
 

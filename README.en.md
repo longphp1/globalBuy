@@ -33,7 +33,7 @@ npm start
 | `data/catalog.json` | The published snapshot stored in the repository. Live pages fall back to this file when Supabase does not yet have a snapshot. |
 | `public/` | Styles, fonts, platform icons, and product images. Include this directory in the deployment. |
 
-The public pages do not change immediately after a product or website setting is edited. Click **Update website** in the admin to publish a new snapshot. Locally, that writes `data/catalog.json` and pushes `main`. On Vercel, it writes the snapshot to Supabase, and the public pages then read that snapshot.
+The public pages do not change immediately after a product or website setting is edited. Those pages read only `data/catalog.json` and are built as static pages, so opening them does not connect to Supabase. Locally, **Update website** regenerates that file and pushes `main`, and Vercel rebuilds the static pages. Creates and edits in the live admin are stored only in Supabase.
 
 On the local machine, the button runs these steps in order:
 
@@ -56,7 +56,7 @@ The Vercel runtime filesystem is read-only, so it cannot create or modify `data/
 3. Install the [Supabase](https://vercel.com/marketplace/supabase) integration on the Vercel project and select the Supabase project. The app reads either `POSTGRES_URL` or the prefixed `WEIDIAN_POSTGRES_URL`. You can instead set `SUPABASE_DB_URL` to the connection string from the Supabase dashboard (Database → Connection string, Transaction pooler).
 4. Redeploy once so the connection string is available at runtime. The repository must include `data/catalog.json` and `public/`. Product images live under `public`.
 5. Open the live `/admin/products` page. The first visit imports the sites and products from `catalog.json` into Supabase. Later creates, updates, deletes, and queries use that database.
-6. On Vercel, **Update website** does not run git. It writes the current products into the Supabase published snapshot, and the home page and product pages then read that snapshot. Locally, the same button still follows the git flow and pushes `main`.
+6. On Vercel, **Update website** does not run git. It writes the current products to Supabase only. The home page, site pages, and product details do not read that database. They are static pages built from `data/catalog.json`. To refresh them, click **Update website** on the local machine. The redeploy after that push includes the new static files.
 
 The HioBuy key is stored in whichever database the current environment uses. After switching to Supabase, save it again in **HioBuy settings**. `HIOBUY_API_KEY` and `HIOBUY_API_BASE` remain available as environment-variable fallbacks.
 
@@ -99,7 +99,7 @@ Quickstart also shows the variables below. Product saves and queries in this pro
 
 When the integration is already connected, do not create another `SUPABASE_DB_URL`. Confirm that **Environment Variables** has `WEIDIAN_POSTGRES_URL` for both Production and Preview, then redeploy. After that deployment finishes, open the live `/admin/products` page.
 
-On the first admin visit, the app creates the `sites`, `menus`, `products`, and `meta` tables in Supabase and imports `data/catalog.json` from the repository. You do not need to create those tables in the Supabase Table Editor. Later queries, creates, updates, and deletes write to these four tables. **Update website** stores the published snapshot in `meta.published_catalog`. Public pages read that snapshot first, and they keep reading `catalog.json` from the repository until a snapshot exists.
+On the first admin visit, the app creates the `sites`, `menus`, `products`, and `meta` tables in Supabase and imports `data/catalog.json` from the repository. You do not need to create those tables in the Supabase Table Editor. Later admin queries, creates, updates, and deletes write to these four tables. Public pages do not read them.
 
 ## 2. HioBuy product lookup
 
@@ -175,7 +175,7 @@ If the name or the price is missing, that lookup fails and no partial product is
 
 ## 3. Product detail actions
 
-The detail URL is `/{site slug}/products/{product slug}`, the page opened from a product card. Locally, the data comes from the published `catalog.json`. On Vercel, the page reads the published snapshot in Supabase first and falls back to `catalog.json` when no snapshot exists.
+The detail URL is `/{site slug}/products/{product slug}`, the page opened from a product card. The page reads the published `catalog.json` and does not connect to a database.
 
 ### Browsing
 

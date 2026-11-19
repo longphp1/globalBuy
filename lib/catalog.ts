@@ -1,15 +1,4 @@
-import catalogJson from "@/data/catalog.json";
-import type { Catalog, Product, Site, SiteCatalog } from "@/lib/types";
-
-export const catalog = catalogJson as Catalog;
-
-export function getSite(slug: string): Site | undefined {
-  return catalog.sites.find((site) => site.slug === slug);
-}
-
-export function getSiteCatalog(site: Site): SiteCatalog {
-  return catalog.catalogs[site.siteId] ?? { menus: [], products: [] };
-}
+import type { Product } from "@/lib/types";
 
 export function decodeSegment(value: string) {
   try {
@@ -39,9 +28,12 @@ export function filterProducts(products: Product[], menuUrl: string, brand: stri
 
 export function brandList(products: Product[], menuUrl: string) {
   const source = menuUrl === "home" ? products : products.filter((item) => item.menuUrl === menuUrl);
+  const seen = new Set<string>();
   const brands: string[] = [];
   for (const item of source) {
-    if (item.brand && !brands.includes(item.brand)) brands.push(item.brand);
+    if (!item.brand || seen.has(item.brand)) continue;
+    seen.add(item.brand);
+    brands.push(item.brand);
   }
   brands.push("All");
   return brands;

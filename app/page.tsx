@@ -4,6 +4,8 @@ import { ProductListing, listingTitle } from "@/components/ProductListing";
 import { SiteFrame } from "@/components/SiteFrame";
 import { homeSite } from "@/lib/store";
 
+export const dynamic = "force-static";
+
 export async function generateMetadata(): Promise<Metadata> {
   const site = await homeSite();
   if (!site) {

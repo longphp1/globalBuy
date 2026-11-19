@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { listSites } from "@/lib/store";
 
+export const dynamic = "force-static";
+
 export const metadata: Metadata = {
   title: "Global Buy Spreadsheets",
   description: "Shopping spreadsheets for Acbuy, Cnfans, Kakobuy, Mulebuy, TaooBuy, and Weidian.",
