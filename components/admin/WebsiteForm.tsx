@@ -4,9 +4,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 type WebsiteLanguage = { code: string; label: string };
-type WebsiteSite = { id: number; catalogId: number; slug: string; name: string; url: string; title: string };
+type WebsiteSite = { id: number; catalogId: number; slug: string; name: string; url: string; title: string; buyLink: string };
 
-const emptySite = (): WebsiteSite => ({ id: -Date.now(), catalogId: 1, slug: "", name: "", url: "", title: "" });
+const emptySite = (): WebsiteSite => ({ id: -Date.now(), catalogId: 1, slug: "", name: "", url: "", title: "", buyLink: "" });
 
 export function WebsiteForm() {
   const router = useRouter();
@@ -100,6 +100,9 @@ export function WebsiteForm() {
             </label>
             <label className="admin-field">网站标题
               <input value={item.title} onChange={(event) => updateSite(item.id, "title", event.target.value)} />
+            </label>
+            <label className="admin-field span-2">网站商品链接
+              <input value={item.buyLink ?? ""} placeholder="{商品ID}、{原始链接}，TaooBuy 用 {tao_buy_link}" onChange={(event) => updateSite(item.id, "buyLink", event.target.value)} />
             </label>
           </div>
         </div>

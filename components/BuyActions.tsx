@@ -1,13 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import { JoinButton } from "@/components/JoinDialog";
-import { platformLinks } from "@/lib/platforms";
+import { productBuyUrl } from "@/lib/platforms";
 import type { Product } from "@/lib/types";
 
-export function BuyActions({ product }: { product: Product }) {
-  const [open, setOpen] = useState(false);
-  const links = platformLinks(product);
+export function BuyActions({ product, buyLink }: { product: Product; buyLink: string }) {
+  const href = productBuyUrl(buyLink, product);
 
   async function copyLink() {
     const text = product.sourceProductUrl;
@@ -27,11 +25,12 @@ export function BuyActions({ product }: { product: Product }) {
   return (
     <>
       <a
-        href="#"
+        href={href || undefined}
         className="btn buy"
+        target="_blank"
+        rel="noreferrer"
         onClick={(event) => {
-          event.preventDefault();
-          setOpen(true);
+          if (!href) event.preventDefault();
         }}
       >
         Select Buy On Platform
@@ -47,39 +46,6 @@ export function BuyActions({ product }: { product: Product }) {
         Copy original link
       </a>
       <JoinButton className="join-btn btn">Join discord for more discounts</JoinButton>
-      <div
-        className={`modal-overlay${open ? " active" : ""}`}
-        id="modalOverlay"
-        onClick={(event) => {
-          if (event.target === event.currentTarget) setOpen(false);
-        }}
-      >
-        <div className="modal-content">
-          <div className="modal-header">Please choose a platform</div>
-          <ul className="options-list">
-            {links.map((item) => (
-              <li className="option-item" key={item.name}>
-                <a className="platform-info" target="_blank" href={item.href} rel="noreferrer">
-                  <span className="platform-letter">{item.letter}</span>
-                  <span>
-                    <img src={item.logo} alt={item.name} width={120} height={24} />
-                  </span>
-                  <span className="platform-name">{item.name}</span>
-                  {item.recommended ? <span className="platform-badge">REC</span> : null}
-                </a>
-                <a className="buy-btn" target="_blank" href={item.href} rel="noreferrer">
-                  Buy Now
-                </a>
-              </li>
-            ))}
-          </ul>
-          <div className="modal-footer">
-            <button className="close-btn" type="button" onClick={() => setOpen(false)}>
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
     </>
   );
 }

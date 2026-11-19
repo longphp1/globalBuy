@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { BuyActions } from "@/components/BuyActions";
 import { RelatedCard } from "@/components/ProductCard";
 import { findProduct, listingPath, relatedProducts } from "@/lib/catalog";
+import { defaultBuyLink } from "@/lib/platforms";
 import { getSite, getSiteCatalog } from "@/lib/store";
 import type { MenuItem } from "@/lib/types";
 
@@ -52,7 +53,7 @@ export async function ProductDetail({ siteSlug, slug }: { siteSlug: string; slug
             <div className="best">Best Selling</div>
             <div className="price">${product.price}</div>
             <h1 className="name">{product.name}</h1>
-            <BuyActions product={product} />
+            <BuyActions product={product} buyLink={site.buyLink || defaultBuyLink(site.name, site.slug)} />
           </div>
         </div>
         <div className="container extension">

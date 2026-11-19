@@ -28,6 +28,7 @@ export type Site = {
   url: string;
   title: string;
   siteId: string;
+  buyLink?: string;
 };
 
 export type Catalog = {
@@ -35,12 +36,4 @@ export type Catalog = {
   generatedAt: string;
   catalogs: Record<string, SiteCatalog>;
   sites: Site[];
-};
-
-export type PlatformLink = {
-  name: string;
-  letter: string;
-  logo: string;
-  href: string;
-  recommended?: boolean;
 };

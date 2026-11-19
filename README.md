@@ -187,13 +187,11 @@ Authorization: Bearer YOUR_API_KEY
 
 ### Select Buy On Platform
 
-打开「Please choose a platform」。每一行有平台名和 **Buy Now**，都在新标签打开同一个链接。点遮罩或 **Close** 关闭。
+在新标签直接打开当前网站配置的商品链接，不再弹出平台列表。链接模板在 **Website settings** 里，写在网站标题后面的 **网站商品链接**。模板里的 `{商品ID}` 换成来源商品 ID，`{原始链接}` 换成原始商品地址，`{tao_buy_link}` 换成该商品保存的 TaooBuy 链接。名称能对应上的网站会带上这些默认模板：
 
-TaooBuy 使用商品里保存的 `tao_buy_link`，并标为 **REC**。其余平台用原始链接或来源商品 ID 拼地址：
-
-| 平台 | 打开的地址 |
+| 网站 | 默认模板 |
 | --- | --- |
-| TaooBuy | 商品的 `tao_buy_link` |
+| TaooBuy | `{tao_buy_link}` |
 | KakoBuy | `https://kakobuy.com/item/details?url={原始链接}` |
 | Mulebuy | `https://mulebuy.com/product?id={商品ID}&platform=WEIDIAN&searchInfo={原始链接}` |
 | JoyagooBuy | `https://joyagoo.com/product?id={商品ID}&platform=WEIDIAN` |
@@ -205,7 +203,7 @@ TaooBuy 使用商品里保存的 `tao_buy_link`，并标为 **REC**。其余平�
 | AlChinaBuy | `https://www.allchinabuy.com/en/page/buy/?nTag=Home-search&from=search-input&_search=url&position=&url={原始链接}` |
 | SuperBuy | `https://www.superbuy.com/en/page/buy/?nTag=Home-search&from=search-input&url={原始链接}` |
 
-除 TaooBuy、AlChinaBuy、SuperBuy 外，链接按微店商品 ID 拼接。淘宝或 1688 商品如果也走这些按钮，代购站可能认不出 ID，应优先用带完整原始链接的 TaooBuy、KakoBuy、AlChinaBuy 或 SuperBuy。
+公开页面使用已发布目录里的模板。改完这个输入框后，在本机点 **Update website**，新模板才会出现在公开页面上。
 
 ### Copy original link
 

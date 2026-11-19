@@ -1,10 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { getDb, touch, type SqlDb } from "@/lib/admin/db";
+import { defaultBuyLink } from "@/lib/platforms";
 import { invalidatePublishedCatalog } from "@/lib/store";
 
 export type WebsiteLanguage = { code: string; label: string };
-export type WebsiteSite = { id: number; catalogId: number; slug: string; name: string; url: string; title: string };
+export type WebsiteSite = { id: number; catalogId: number; slug: string; name: string; url: string; title: string; buyLink: string };
 export type WebsiteConfig = {
   pageSize: number;
   defaultLanguage: string;
@@ -46,14 +47,19 @@ export async function getWebsiteConfig(): Promise<WebsiteConfig> {
       languages = DEFAULT_LANGUAGES;
     }
   }
-  const sites = (await db.prepare("SELECT id, catalog_id, slug, name, url, title FROM sites ORDER BY id").all()).map((row) => ({
-    id: Number(row.id),
-    catalogId: Number(row.catalog_id),
-    slug: text(row.slug),
-    name: text(row.name),
-    url: text(row.url),
-    title: text(row.title),
-  }));
+  const sites = (await db.prepare("SELECT id, catalog_id, slug, name, url, title, buy_link FROM sites ORDER BY id").all()).map((row) => {
+    const name = text(row.name);
+    const slug = text(row.slug);
+    return {
+      id: Number(row.id),
+      catalogId: Number(row.catalog_id),
+      slug,
+      name,
+      url: text(row.url),
+      title: text(row.title),
+      buyLink: text(row.buy_link) || defaultBuyLink(name, slug),
+    };
+  });
   return {
     pageSize: Math.max(1, Number(await meta(db, "website_page_size")) || 50),
     defaultLanguage: (await meta(db, "website_default_language")) || "en",
@@ -93,13 +99,14 @@ export async function saveWebsiteConfig(input: Partial<WebsiteConfig> & { remove
       slugs.add(slug);
       const url = text(site.url).trim();
       const title = text(site.title).trim();
+      const buyLink = text(site.buyLink).trim();
       const current = site.id > 0 ? await db.prepare("SELECT id FROM sites WHERE id = ?").get(site.id) : undefined;
       if (current) {
-        await db.prepare("UPDATE sites SET slug = ?, name = ?, url = ?, title = ? WHERE id = ?").run(slug, name, url, title, site.id);
+        await db.prepare("UPDATE sites SET slug = ?, name = ?, url = ?, title = ?, buy_link = ? WHERE id = ?").run(slug, name, url, title, buyLink, site.id);
         kept.add(site.id);
       } else {
         nextId += 1;
-        await db.prepare("INSERT INTO sites (id, catalog_id, slug, name, url, title) VALUES (?, ?, ?, ?, ?, ?)").run(nextId, catalogId, slug, name, url, title);
+        await db.prepare("INSERT INTO sites (id, catalog_id, slug, name, url, title, buy_link) VALUES (?, ?, ?, ?, ?, ?, ?)").run(nextId, catalogId, slug, name, url, title, buyLink);
         kept.add(nextId);
       }
     }
@@ -189,6 +196,7 @@ export async function generateWebsite() {
       url: site.url,
       title: site.title || site.name,
       siteId: String(site.catalogId),
+      buyLink: site.buyLink || defaultBuyLink(site.name, site.slug),
     })),
   };
   const serialized = JSON.stringify(payload);

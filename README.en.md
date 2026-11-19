@@ -187,25 +187,23 @@ The detail URL is `/{site slug}/products/{product slug}`, the page opened from a
 
 ### Select Buy On Platform
 
-This opens “Please choose a platform”. Each row has the platform name and **Buy Now**, and both open the same link in a new tab. Click the backdrop or **Close** to dismiss it.
+Opens the current website's product link in a new tab. It does not open a platform list. The template is the **Product link** field after the website title in **Website settings**. `{商品ID}` is replaced with the source product ID, `{原始链接}` with the original product URL, and `{tao_buy_link}` with that product's saved TaooBuy link. A site whose name matches one of these platforms starts with that template:
 
-TaooBuy uses the product's saved `tao_buy_link` and is marked **REC**. The other platforms build a URL from the original link or the source product ID:
-
-| Platform | URL |
+| Site | Default template |
 | --- | --- |
-| TaooBuy | The product's `tao_buy_link` |
-| KakoBuy | `https://kakobuy.com/item/details?url={original link}` |
-| Mulebuy | `https://mulebuy.com/product?id={product id}&platform=WEIDIAN&searchInfo={original link}` |
-| JoyagooBuy | `https://joyagoo.com/product?id={product id}&platform=WEIDIAN` |
-| oopBuy | `https://oopbuy.com/product/weidian/{product id}` |
-| Hooby | `https://hoobuy.com/product/2/{product id}` |
-| CnfansBuy | `https://cnfans.com/product?id={product id}&platform=WEIDIAN` |
-| CssBuy | `https://www.cssbuy.com/item-micro-{product id}.html` |
-| AcBuy | `https://acbuy.com/product?id={product id}&source=WD` |
-| AlChinaBuy | `https://www.allchinabuy.com/en/page/buy/?nTag=Home-search&from=search-input&_search=url&position=&url={original link}` |
-| SuperBuy | `https://www.superbuy.com/en/page/buy/?nTag=Home-search&from=search-input&url={original link}` |
+| TaooBuy | `{tao_buy_link}` |
+| KakoBuy | `https://kakobuy.com/item/details?url={原始链接}` |
+| Mulebuy | `https://mulebuy.com/product?id={商品ID}&platform=WEIDIAN&searchInfo={原始链接}` |
+| JoyagooBuy | `https://joyagoo.com/product?id={商品ID}&platform=WEIDIAN` |
+| oopBuy | `https://oopbuy.com/product/weidian/{商品ID}` |
+| Hooby | `https://hoobuy.com/product/2/{商品ID}` |
+| CnfansBuy | `https://cnfans.com/product?id={商品ID}&platform=WEIDIAN` |
+| CssBuy | `https://www.cssbuy.com/item-micro-{商品ID}.html` |
+| AcBuy | `https://acbuy.com/product?id={商品ID}&source=WD` |
+| AlChinaBuy | `https://www.allchinabuy.com/en/page/buy/?nTag=Home-search&from=search-input&_search=url&position=&url={原始链接}` |
+| SuperBuy | `https://www.superbuy.com/en/page/buy/?nTag=Home-search&from=search-input&url={原始链接}` |
 
-Except for TaooBuy, AlChinaBuy, and SuperBuy, the links are built from a Weidian product ID. For a Taobao or 1688 product, prefer TaooBuy, KakoBuy, AlChinaBuy, or SuperBuy, because those URLs carry the full original link.
+Public pages use the template in the published catalog. After changing this field, click **Update website** on the local machine so the new template is included in the public pages.
 
 ### Copy original link
 
