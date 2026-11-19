@@ -1,142 +1,123 @@
 # Global Buy
 
-中文 | [English](README.en.md)
+English | [中文](README.zh.md)
 
-多站点购物表格。公开页面展示已发布的商品、分类和代购链接。本机的查询、新增、修改和删除使用 SQLite。部署到 Vercel 后，这些操作改为使用 Supabase 数据库。
+A Weidian product spreadsheet. Public pages show Weidian products, categories, and the buying link for the current agent site. One published catalog can be shown on several agent sites. Local admin queries, creates, updates, and deletes use SQLite. After deployment to Vercel, those admin operations use Supabase.
 
-## 一、部署
+## 1. Deployment
 
-### 本地运行
+### Run locally
 
-需要 Node.js 和 npm。在项目目录执行：
+Node.js and npm are required. In the project directory:
 
 ```bash
 npm install
 npm run dev
 ```
 
-打开 [http://localhost:3000](http://localhost:3000)。首页是网站配置里的主站。全部站点在 [http://localhost:3000/spreadsheet](http://localhost:3000/spreadsheet)。商品后台在 [http://localhost:3000/admin/products](http://localhost:3000/admin/products)，首页标题栏的 **Manage WebSite** 也进入这个页面。
+Open [http://localhost:3000](http://localhost:3000). The home page is the primary site from the website configuration. All sites are listed at [http://localhost:3000/spreadsheet](http://localhost:3000/spreadsheet). Product admin is at [http://localhost:3000/admin/products](http://localhost:3000/admin/products). **Manage WebSite** in the home page header opens the same page.
 
-生产模式：
+Production mode:
 
 ```bash
 npm run build
 npm start
 ```
 
-### 数据放在哪里
+### Pull the latest code
 
-| 位置 | 作用 |
+On the local machine, update the project from the remote `main` branch:
+
+```bash
+git checkout main
+git pull origin main
+```
+
+Run this in the project directory before starting local work. Commit or set aside local edits first, so the pull can finish. The remote is `origin`, and the branch is `main`.
+
+### Where data lives
+
+| Location | Purpose |
 | --- | --- |
-| `data/admin.sqlite` | 本机后台的商品、网站配置和 HioBuy 密钥。已加入 `.gitignore`。只在本机使用。 |
-| Supabase | Vercel 上的商品、网站配置、HioBuy 密钥和发布快照。 |
-| `data/catalog.json` | 仓库里的公开站快照。Supabase 里还没有发布快照时，线上页面用它回退。 |
-| `public/` | 样式、字体、平台图标和商品图片。部署时要带上。 |
+| `data/admin.sqlite` | Local products, website settings, and the HioBuy key. It is listed in `.gitignore` and is used only on this machine. |
+| Supabase | Products, website settings, and the HioBuy key on Vercel. |
+| `data/catalog.json` | The published snapshot in the repository. Public pages are built from this file. |
+| `public/` | Styles, fonts, platform icons, and product images. Main images live in `public/products/{product slug}/main.png`. Include this directory in the deployment. |
 
-改完商品或网站配置后，公开页不会立刻变化。公开页面只读取仓库里的 `data/catalog.json`，构建成静态页面，打开时不连接 Supabase。本机点 **Update website** 会重新生成这个文件并推到 `main`，Vercel 随之重新构建静态页面。线上后台的新增和修改只写入 Supabase。
+Public pages read `data/catalog.json` and are built as static pages. Opening them does not connect to Supabase. Creates and edits in the live admin are stored in Supabase. Those edits appear on the public site after the catalog and image files are regenerated on the local machine and pushed to `main`.
 
-本机上，这个按钮会按顺序执行：
+### Update website
+
+On the local machine, **Update website** runs these steps in order:
 
 1. `git reset --hard HEAD`
 2. `git clean -fd`
 3. `git checkout main`
 4. `git clean -fd`
 5. `git pull --no-edit origin main`
-6. 用本地 SQLite 重新生成 `data/catalog.json`
-7. `git add .`，提交信息为 `System auto push platform code time:` 加上本机时间 `Y-m-d H:i:s`，再 `git push origin main`
+6. Regenerate `data/catalog.json` from the local SQLite database, and download any product image that is still a remote URL into `public/products/{product slug}/main.png`
+7. `git add .`, commit with the message `System auto push platform code time:` plus the local time `Y-m-d H:i:s`, then `git push origin main`
 
-第 1 步会丢掉尚未提交的代码。功能改动要先单独提交，再点这个按钮。目录必须是 git 仓库，并且本机能向 `origin` 的 `main` 推送。没有新文件时，生成结束后不会再提交或推送。
+Step 1 discards uncommitted code. Commit feature changes before clicking the button. The directory must be a git repository, and this machine must be able to push `main` to `origin`. If there is nothing new to commit, generation finishes without a commit or a push.
 
-### 部署到 Vercel
+On Vercel, **Update website** cannot be clicked. The deployment filesystem is read-only, so the live site cannot create or change `catalog.json`, product images, or other project files. Admin product and website changes are saved in Supabase. The home page, site pages, and product details do not read Supabase. They are the static files already deployed from the repository. To refresh them, pull the latest code on the local machine and click **Update website** there. The redeploy after that push includes the new static files.
 
-Vercel 的运行目录是只读的，不能创建或修改 `data/admin.sqlite`。线上检测到 `VERCEL=1` 后，查询、新增、修改和删除都连接 Supabase 的 Postgres。本机运行不会读取这个连接，始终使用 SQLite。
+### Deploy on Vercel
 
-1. 把本仓库推到 GitHub。当前远程是 `origin` 的 `main`。
-2. 在 [Vercel](https://vercel.com) 里 Import 这个仓库，框架选 **Next.js**。构建命令保持 `npm run build`，安装命令保持 `npm install`。
-3. 在 Vercel 项目里安装 [Supabase](https://vercel.com/marketplace/supabase) 集成，并选中要使用的 Supabase 项目。集成写入的 `POSTGRES_URL`，或带前缀的 `WEIDIAN_POSTGRES_URL`，程序都会读取。也可以改为在环境变量里设置 `SUPABASE_DB_URL`，值用 Supabase 控制台里的数据库连接串（Database → Connection string，选 Transaction pooler）。
-4. 重新部署一次，让连接串进入运行环境。确认仓库里包含 `data/catalog.json` 和 `public/`。商品图在 `public` 下。
-5. 打开线上的 `/admin/products`。第一次进入会把 `catalog.json` 里的站点和商品写入 Supabase。之后新增、修改、删除和查询都走这张库。
-6. 部署到 Vercel 后，**Update website** 按钮不能点击，接口也不会执行生成。首页、站点页和商品详情不读 Supabase，它们是用 `data/catalog.json` 生成的静态页面。要更新这些页面，在本机点 **Update website**，推送后的重新部署会带上新的静态文件。
+1. Push this repository to GitHub. The current remote is `origin` on `main`.
+2. Import the repository in [Vercel](https://vercel.com) and choose the **Next.js** framework. Keep the build command as `npm run build` and the install command as `npm install`.
+3. Connect Supabase from the Vercel project **Storage** page. The integration writes variables with the `WEIDIAN_` prefix for Preview and Production. The app already reads `WEIDIAN_POSTGRES_URL`. Leave those values in Vercel. Do not copy them into the repository.
+4. Redeploy once so the connection string is available at runtime. The repository must include `data/catalog.json` and `public/`.
+5. Open the live `/admin/products` page. The first visit creates the tables and imports the sites and products from `catalog.json`. Later creates, updates, deletes, and queries use Supabase.
 
-HioBuy 密钥保存在当前环境使用的数据库里。换到 Supabase 后要在 **HioBuy settings** 里重新保存一次。`HIOBUY_API_KEY` 和 `HIOBUY_API_BASE` 仍可作为环境变量备用。
+The HioBuy key is stored in whichever database the current environment uses. After switching to Supabase, save it again in **HioBuy settings**. `HIOBUY_API_KEY` and `HIOBUY_API_BASE` remain available as environment-variable fallbacks.
 
-### Supabase 配置
+### Supabase
 
-当前 Vercel 项目 `global-buy` 已在 **Storage** 里连接 Supabase 数据库 `supabase-cordovan-envelope`，环境包括 Preview 和 Production。集成创建变量时使用了前缀 `WEIDIAN_`。这些值留在 Vercel 的环境变量里，不要写进仓库。
+Local development keeps using SQLite. No Supabase setup is required on the local machine.
 
-打开 **Storage → supabase-cordovan-envelope**，在 **Quickstart** 里可以看到全部变量。程序只使用数据库连接串，按下面的顺序取第一个有值的变量：
+On Vercel, connect the Supabase database in **Storage**. The integration creates `WEIDIAN_POSTGRES_URL` for Preview and Production. The code already accepts that `WEIDIAN_` prefix, so there is no separate connection string to add. Confirm the variable exists, then redeploy.
 
-| 顺序 | 变量 | 作用 |
-| --- | --- | --- |
-| 1 | `SUPABASE_DB_URL` | 手动指定的连接串。没有这项时跳过。 |
-| 2 | `WEIDIAN_POSTGRES_URL` | 当前集成提供的 Transaction pooler，端口 `6543`。线上默认使用这一项。 |
-| 3 | `WEIDIAN_POSTGRES_URL_NON_POOLING` | Session pooler，端口 `5432`。上一项为空时使用。 |
-| 4 | `WEIDIAN_POSTGRES_PRISMA_URL` | 带 `pgbouncer=true` 的连接串。前两项都为空时使用。 |
-| 5 | `POSTGRES_URL`、`POSTGRES_PRISMA_URL`、`DATABASE_URL`、`POSTGRES_URL_NON_POOLING` | 没有 `WEIDIAN_` 前缀时的同一组变量。 |
+The first admin visit creates `sites`, `menus`, `products`, and `meta`, and imports `data/catalog.json`. Tables do not need to be created by hand. Public pages do not read these tables.
 
-`WEIDIAN_POSTGRES_URL` 的格式是：
+## 2. HioBuy product lookup
 
-```text
-postgres://postgres.<项目ID>:<数据库密码>@aws-1-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require
-```
+Product data comes from the [HioBuy public API](https://hiobuy.com/zh/api-docs). The machine-readable description is [openapi.json](https://api.hiobuy.com/openapi.json). This project uses only product detail: `POST https://api.hiobuy.com/v1/products/detail`.
 
-连接串里的 `pgbouncer`、`connection_limit` 和其他查询参数会在连接前去掉，只保留 `sslmode=require`。
+Open the developer center at [https://developers.hiobuy.com/](https://developers.hiobuy.com/) to register, create an application, and manage the API key.
 
-下面这些变量会出现在 Quickstart 里，本项目的商品保存和查询不会读取它们：
+### Create a key
 
-| 变量 | 说明 |
-| --- | --- |
-| `NEXT_PUBLIC_WEIDIAN_SUPABASE_URL` | Supabase 项目地址，形如 `https://<项目ID>.supabase.co`。 |
-| `NEXT_PUBLIC_WEIDIAN_SUPABASE_ANON_KEY` | 匿名公钥。 |
-| `NEXT_PUBLIC_WEIDIAN_SUPABASE_PUBLISHABLE_KEY` | 可公开的 publishable key。 |
-| `WEIDIAN_SUPABASE_SERVICE_ROLE_KEY` | 服务端密钥，权限很高。 |
-| `WEIDIAN_SUPABASE_SECRET_KEY` | 服务端 secret key。 |
-| `WEIDIAN_SUPABASE_JWT_SECRET` | JWT 签名密钥。 |
-| `WEIDIAN_POSTGRES_HOST` | 数据库主机，形如 `db.<项目ID>.supabase.co`。 |
-| `WEIDIAN_POSTGRES_USER` | 数据库用户，通常是 `postgres`。 |
-| `WEIDIAN_POSTGRES_PASSWORD` | 数据库密码。 |
-| `WEIDIAN_POSTGRES_DATABASE` | 数据库名，通常是 `postgres`。 |
-
-已经通过集成连上数据库时，不需要再新建 `SUPABASE_DB_URL`。确认 **Environment Variables** 里 Production 和 Preview 都有 `WEIDIAN_POSTGRES_URL`，然后重新部署一次。部署完成后再打开线上的 `/admin/products`。
-
-第一次打开后台时，程序会在 Supabase 里创建 `sites`、`menus`、`products`、`meta` 四张表，并把仓库中的 `data/catalog.json` 导入进去。不需要在 Supabase 的 Table Editor 里手工建表。之后后台的查询、新增、修改和删除都写入这四张表。公开页面不读取这些表。
-
-## 二、对接 HioBuy 查询商品
-
-商品资料来自 [HioBuy 公开 API](https://hiobuy.com/zh/api-docs)。机器可读说明在 [openapi.json](https://api.hiobuy.com/openapi.json)。本项目只用商品详情：`POST https://api.hiobuy.com/v1/products/detail`。
-
-### 准备密钥
-
-在 HioBuy 开发者中心注册并验证邮箱。系统会自动创建第一个应用。打开应用，创建 API Key。完整密钥只显示一次，请求头使用：
+In the [developer center](https://developers.hiobuy.com/), register and verify the email address. The system creates the first application automatically. Open the application and create an API key. The full key is shown only once. Send it in the request header:
 
 ```http
 Authorization: Bearer YOUR_API_KEY
 ```
 
-当前密钥前缀是 `hio_live_`。商品查询返回 1688、淘宝、微店的真实数据，不需要自己做平台 OAuth。试用从第一个应用开始算 7 天，1688 和微店每天共享 100 个计费 units（按 UTC 日）。商品详情通常消耗 1 unit，搜索消耗 2 units。淘宝接口需要有效付费订阅，试用额度不包含淘宝。套餐、额度和采购服务费以文档页面为准。支持邮箱是 support@hiobuy.com。
+Current keys use the `hio_live_` prefix. Product lookup returns live 1688, Taobao, and Weidian data. A personal marketplace OAuth flow is not required. The trial lasts 7 days from the first application. 1688 and Weidian share 100 billable units per UTC day. Product detail normally costs 1 unit, and search costs 2 units. The Taobao API requires an active paid subscription. The trial quota does not include Taobao. Plans, quotas, and the purchasing service fee are described on the documentation page.
 
-### 在本项目里保存配置
+### Save the settings in this project
 
-打开 `/admin/products`，第一行点 **HioBuy settings**：
+Open `/admin/products` and click **HioBuy settings** on the first row:
 
-- **API Key**：上面创建的密钥。
-- **API address**：默认 `https://api.hiobuy.com`，不要带末尾斜杠。
+- **API Key**: the key created above.
+- **API address**: `https://api.hiobuy.com` by default, without a trailing slash.
 
-保存后写入当前数据库的 `meta` 表（`hiobuy_api_key`、`hiobuy_api_base`）。本机写入 SQLite，Vercel 写入 Supabase。没填数据库时，才回退到环境变量 `HIOBUY_API_KEY`、`HIOBUY_API_BASE`。
+Saving writes the `meta` table in the current database (`hiobuy_api_key` and `hiobuy_api_base`). Locally that database is SQLite. On Vercel it is Supabase. When the database has no key, the app falls back to `HIOBUY_API_KEY` and `HIOBUY_API_BASE`.
 
-### 本项目发出的请求
+### The request this project sends
 
-新增商品时，在商品表单里粘贴 1688、淘宝、天猫或微店链接。页面会请求本机 `POST /admin/api/products/fetch`，服务端再调用 HioBuy。批量导入里的链接查询走同一套逻辑，最多 5 个并发，单次超时 40 秒。
+When adding a product, paste a 1688, Taobao, Tmall, or Weidian link into the product form. The page calls `POST /admin/api/products/fetch`, and the server calls HioBuy. Link import uses the same lookup, with at most 5 requests at a time and a 40-second timeout for each request.
 
-链接会先识别渠道：
+The link is matched to a channel first:
 
-| 链接 | `channel` |
+| Link | `channel` |
 | --- | --- |
-| 含 `1688.com` | `1688` |
-| 含 `weidian.com` | `weidian` |
-| 含 `taobao.com`、`tmall.com` 或 `tb.cn` | `taobao` |
+| Contains `1688.com` | `1688` |
+| Contains `weidian.com` | `weidian` |
+| Contains `taobao.com`, `tmall.com`, or `tb.cn` | `taobao` |
 
-识别不了就拒绝查询。请求体固定为：
+A link that matches none of these is rejected. The request body is fixed as:
 
 ```json
 {
@@ -147,7 +128,7 @@ Authorization: Bearer YOUR_API_KEY
 }
 ```
 
-`channel` 是接口必填项。`language` 决定翻译文案，这里固定英文。`response_format` 用 `standard`，返回 HioBuy 统一结构；`upstream` 才会返回平台原始 JSON，本项目不用。成功时响应是：
+`channel` is required by the API. `language` chooses the translated text and is fixed to English here. `response_format` is `standard`, which returns HioBuy's unified shape. `upstream` would return the marketplace's raw JSON, and this project does not use it. A successful response is:
 
 ```json
 {
@@ -156,40 +137,53 @@ Authorization: Bearer YOUR_API_KEY
 }
 ```
 
-失败时页面显示接口返回的 `message`。常见状态：401 密钥无效，403 无渠道权限或额度不足，404 找不到商品，503 渠道未就绪。
+On failure, the page shows the `message` returned by the API. Common statuses: 401 for an invalid key, 403 for a missing channel permission or an exhausted quota, 404 when the product cannot be found, and 503 when the channel is not ready.
 
-### 字段如何填进商品
+### How fields fill a product
 
-| HioBuy `product` | 本站商品字段 |
+| HioBuy `product` | Field in this site |
 | --- | --- |
-| `title.translated`，没有则用 `title.original` | 商品名称 |
-| `price.promotion_amount`，其次 `display_amount`，再其次 `original_amount` | 价格 |
-| `images` 里 `type` 为 `main` 的 `url` | 主图。这是图片地址时，会下载并保存为 `public/products/{商品 slug}/main.png` |
-| 其余图片 `url`，逗号拼接 | 附图 |
-| `channel`：`weidian` 记为 `WD`，`taobao` 记为 `TB`，1688 保留 `1688` | 来源 |
-| `metadata.brand` | 品牌 |
-| `source_product_id` | 来源商品 ID |
-| `source_url`，没有则用用户粘贴的链接 | 原始链接，也作为主购买链接 |
+| `title.translated`, or `title.original` when the translation is missing | Product name |
+| `price.promotion_amount`, then `display_amount`, then `original_amount` | Price |
+| `url` of the image whose `type` is `main` | Main image. A remote URL is downloaded and saved as `public/products/{product slug}/main.png` |
+| The other image `url` values, joined with commas | Extra images |
+| `channel`: `weidian` is stored as `WD`, `taobao` as `TB`, and 1688 stays `1688` | Source |
+| `metadata.brand` | Brand |
+| `source_product_id` | Source product ID |
+| `source_url`, or the link the user pasted | Original link, also used as the main buy link |
 
-名称或价格缺失时，这次查询记为失败，不会写入半条商品。查到主图地址后，会立刻下载并保存为 `public/products/{商品 slug}/main.png`，表单里的主图改为 `/products/{商品 slug}/main.png`。新增商品、修改商品和导入商品时，主图只要是网址，也会保存到同一位置。查到的其他结果只填进表单，还要点保存才会写入当前数据库：本机是 SQLite，Vercel 是 Supabase。公开站要在本机点 **Update website** 才会更新。Vercel 的目录是只读的，线上新增或导入不能把图片写入 `public/products`，这类操作放在本机完成。
+If the name or the price is missing, that lookup fails and no partial product is stored. When the main image is a remote URL, it is downloaded immediately and saved as `public/products/{product slug}/main.png`. The form then stores `/products/{product slug}/main.png`. Creating, editing, and importing a product do the same whenever the main image is a URL. The other looked-up fields only fill the form and are written after Save: SQLite locally, Supabase on Vercel. The public site updates after **Update website** on the local machine. The Vercel filesystem is read-only, so creating or importing a product there cannot write `public/products`. Do that on the local machine.
 
-## 三、商品详情页的操作
+## 3. Website settings
 
-详情页地址是 `/{站点 slug}/products/{商品 slug}`，例如首页商品卡片点进去的页面。页面数据来自已发布的 `catalog.json`，不连接数据库。
+Open `/admin/products` and click **Website settings**. The page is `/admin/products/website`. Saving writes the current database: SQLite locally, Supabase on Vercel. Public pages use these values after a local **Update website** publishes `data/catalog.json`.
 
-### 浏览和跳转
+| Field | What to enter |
+| --- | --- |
+| 每页商品数量 | How many products a public listing shows on one page. |
+| 默认语言 | The default language code, such as `en`. |
+| 语言 | The label shown for each language code. |
+| 网站名称 | The site name shown in the header and on the product page. |
+| 网站标识 | The URL slug, such as `kakobuy`. The public site is `/{slug}`. Leave it empty to generate the slug from the site name. |
+| 网站链接 | The site URL opened by **Join**. |
+| 网站标题 | The browser title for that site. |
+| 网站商品链接 | The product-link template used by **Select Buy On Platform**. See below. |
 
-- **面包屑**：`{站点名} Spreadsheet / 分类 / 品牌 / 商品名`。前三段分别回到该站首页、该分类的全部商品、该品牌列表。
-- **品牌名**：详情标题上方的品牌链接，进入同一分类下的该品牌。
-- **说明标题**：`You can buy this {商品名} go to {站点名}`。
-- **分类标签**：该站全部菜单。当前分类高亮。点其他分类进入该分类的 All 列表；点 Home 回到该站首页。
-- **主图、Best Selling、价格、商品名**：展示已发布的图片和价格，价格前带 `$`。
+**添加网站** adds another site. **删除网站** removes a site that has no products and no categories. **保存** writes the form.
 
-### Select Buy On Platform
+### 网站商品链接
 
-在新标签直接打开当前网站配置的商品链接，不再弹出平台列表。链接模板在 **Website settings** 里，写在网站标题后面的 **网站商品链接**。模板里的 `{商品ID}` 换成来源商品 ID，`{原始链接}` 换成原始商品地址，`{tao_buy_link}` 换成该商品保存的 TaooBuy 链接。名称能对应上的网站会带上这些默认模板：
+This template is the address opened when a visitor clicks **Select Buy On Platform** on that site. Three tokens are replaced for the current product:
 
-| 网站 | 默认模板 |
+| Token | Replaced with |
+| --- | --- |
+| `{商品ID}` | The source product ID |
+| `{原始链接}` | The original product URL |
+| `{tao_buy_link}` | The TaooBuy link saved on that product |
+
+A site whose name matches a known agent starts with that agent's template. The field can be edited. Use one of these templates:
+
+| Site | Template |
 | --- | --- |
 | TaooBuy | `{tao_buy_link}` |
 | KakoBuy | `https://kakobuy.com/item/details?url={原始链接}` |
@@ -203,22 +197,38 @@ Authorization: Bearer YOUR_API_KEY
 | AlChinaBuy | `https://www.allchinabuy.com/en/page/buy/?nTag=Home-search&from=search-input&_search=url&position=&url={原始链接}` |
 | SuperBuy | `https://www.superbuy.com/en/page/buy/?nTag=Home-search&from=search-input&url={原始链接}` |
 
-公开页面使用已发布目录里的模板。改完这个输入框后，在本机点 **Update website**，新模板才会出现在公开页面上。
+TaooBuy uses the product's own `tao_buy_link`. KakoBuy, AlChinaBuy, and SuperBuy place the original product URL in the address. Mulebuy sends both the product ID and the original URL. JoyagooBuy, oopBuy, Hooby, CnfansBuy, CssBuy, and AcBuy build the address from the Weidian product ID. A site name that matches none of these starts with an empty field. Paste the matching template from the table.
+
+## 4. Product detail actions
+
+The detail URL is `/{site slug}/products/{product slug}`, the page opened from a product card. The page reads the published `catalog.json` and does not connect to a database.
+
+### Browsing
+
+- **Breadcrumb**: `{site name} Spreadsheet / category / brand / product name`. The first three parts return to the site home, all products in that category, and that brand list.
+- **Brand name**: the brand link above the detail title opens the same brand inside the same category.
+- **Heading**: `You can buy this {product name} go to {site name}`.
+- **Category tabs**: every menu on the site. The current category is highlighted. Another category opens its All list. Home returns to the site home page.
+- **Main image, Best Selling, price, and product name**: the published image and price. The price is prefixed with `$`.
+
+### Select Buy On Platform
+
+The button opens the current website's product link in a new tab. It uses the **网站商品链接** template saved for that site. `{商品ID}`, `{原始链接}`, and `{tao_buy_link}` are filled from the product being viewed. The button does not open a list of other agent sites. The templates and the website fields are described in [Website settings](#3-website-settings). After the template is changed, click **Update website** on the local machine so the public page uses the new address.
 
 ### Copy original link
 
-把商品的原始链接写入剪贴板，并弹出 `{链接} copied successfully`。浏览器不允许剪贴板 API 时，改用页面内的临时文本框复制。
+Copies the product's original link and shows `{link} copied successfully`. If the browser blocks the clipboard API, the page copies the link with a temporary text field.
 
 ### Join discord for more discounts
 
-打开说明层，两行文字：把商品照片发给客服帮忙找货；准备下单时联系客服获取折扣。**Join {站点名}** 在新标签打开该站配置里的网址。右上角关闭图片可关掉这层。页头的 Join 按钮打开的是同一个说明层。
+Opens a panel with two lines: send product photos to customer service so they can help find the item, and contact customer service on Discord before ordering to get a discount. **Join {site name}** opens the site URL from the website configuration in a new tab. The close image at the top right dismisses the panel. The Join button in the page header opens the same panel.
 
-### 绕过不可购买提示
+### Bypass the not-purchasable warning
 
-详情下方有 Chrome 扩展入口，文案是 How to bypass “Non - purchasable item” warning automatically。**Download chrome extension** 打开 Chrome 网上应用店的 Risk Reminder Remover：
+Under the detail, a Chrome extension block says How to bypass “Non - purchasable item” warning automatically. **Download chrome extension** opens Risk Reminder Remover in the Chrome Web Store:
 
 `https://chromewebstore.google.com/detail/risk-reminder-remover/afgegfoedkeffjkkkjkbpnegceleakeo`
 
-### 相关商品
+### Related products
 
-底部 **{品牌} Product More** 链到当前品牌列表。旁边最多 5 个商品：先取同分类、同品牌的其他商品；不够再用同分类的其他品牌；仍不够再用全站其余商品。点卡片进入对应详情。
+**{brand} Product More** at the bottom links to the current brand list. Up to five products are shown beside it: other products in the same category and brand first, then other brands in the same category, then products from the rest of the site. A card opens that product's detail page.
