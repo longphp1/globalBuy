@@ -83,27 +83,40 @@ const POSTGRES_SCHEMA = [
 ];
 
 function cleanDatabaseUrl(raw: string) {
-  const value = raw.trim();
+  const value = raw.trim().replace(/^["']|["']$/g, "");
   if (!value) return "";
   try {
     const parsed = new URL(value);
-    parsed.searchParams.delete("pgbouncer");
-    parsed.searchParams.delete("connection_limit");
+    const sslmode = parsed.searchParams.get("sslmode");
+    parsed.search = "";
+    if (sslmode) parsed.searchParams.set("sslmode", sslmode);
     return parsed.toString();
   } catch {
     return value;
   }
 }
 
+function envValue(...names: string[]) {
+  for (const name of names) {
+    const value = process.env[name]?.trim();
+    if (value) return value;
+  }
+  return "";
+}
+
 export function databaseUrl() {
   if (process.env.VERCEL !== "1") return "";
   return cleanDatabaseUrl(
-    process.env.SUPABASE_DB_URL ||
-      process.env.POSTGRES_URL ||
-      process.env.POSTGRES_PRISMA_URL ||
-      process.env.DATABASE_URL ||
-      process.env.POSTGRES_URL_NON_POOLING ||
-      "",
+    envValue(
+      "SUPABASE_DB_URL",
+      "WEIDIAN_POSTGRES_URL",
+      "WEIDIAN_POSTGRES_URL_NON_POOLING",
+      "WEIDIAN_POSTGRES_PRISMA_URL",
+      "POSTGRES_URL",
+      "POSTGRES_PRISMA_URL",
+      "DATABASE_URL",
+      "POSTGRES_URL_NON_POOLING",
+    ),
   );
 }
 
@@ -420,7 +433,7 @@ export async function getDb(options?: { seed?: boolean }): Promise<SqlDb> {
     const url = databaseUrl();
     if (!url) {
       throw new Error(
-        "This deployment runs on Vercel and saves data in Supabase. Install the Supabase integration in the Vercel project, or set SUPABASE_DB_URL to the database connection string, then redeploy.",
+        "This deployment runs on Vercel and saves data in Supabase. Set WEIDIAN_POSTGRES_URL or SUPABASE_DB_URL to the database connection string, then redeploy.",
       );
     }
     return openPostgres(url, withSeed);
